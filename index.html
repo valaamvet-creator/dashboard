@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Выручка</title>
+<style>
+  :root{
+    --bg:#0f1419; --card:#161c23; --line:#232b35; --text:#e6edf3; --muted:#8b98a8;
+    --cur:#3b82f6; --prev:#3a4654; --up:#34d399; --dn:#f87171; --warn:#f59e0b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    font-variant-numeric:tabular-nums}
+  .wrap{max-width:1100px;margin:0 auto;padding:16px}
+  header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:10px}
+  h1{font-size:20px;margin:0;font-weight:800}
+  #updated{color:var(--muted);font-size:12px;white-space:nowrap}
+  .chips{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+  .chip{padding:6px 14px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-size:13px;background:none;cursor:pointer}
+  .chip.on{background:var(--cur);border-color:var(--cur);color:#fff;font-weight:700}
+  .chip:disabled{cursor:default;opacity:.5}
+  .banner{display:none;background:rgba(245,158,11,.12);border:1px solid var(--warn);color:#fcd34d;
+    border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px}
+  .banner.show{display:block}
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .tiles > .card:first-child{grid-column:1/-1}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .l{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .v{font-size:26px;font-weight:800;margin-top:4px;line-height:1.1}
+  .sub{font-size:12px;color:var(--muted);margin-top:4px}
+  .up{color:var(--up)} .dn{color:var(--dn)} .na{color:var(--muted)}
+  .blocks{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px}
+  .cmp{display:flex;gap:14px;align-items:center}
+  .pair{flex:1;min-width:0}
+  .row{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+  .row b{color:var(--text);font-weight:600}
+  .bar{height:10px;border-radius:5px;margin:4px 0 10px;background:var(--prev)}
+  .bar.cur{background:var(--cur)}
+  .big{font-size:26px;font-weight:800;min-width:84px;text-align:right}
+  .t{display:flex;justify-content:space-between;margin-bottom:8px}
+  .t span:last-child{color:var(--muted);font-size:12px}
+  .chart{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:150px;margin-top:6px}
+  .m{display:flex;gap:2px;align-items:flex-end;height:100%}
+  .m i{flex:1;display:block;border-radius:3px 3px 0 0;background:var(--cur);min-height:0}
+  .m i.p{background:var(--prev)}
+  .axis,.pcts{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;font-size:11px;text-align:center;margin-top:4px}
+  .axis{color:var(--muted)}
+  .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px}
+  .legend b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+  footer{color:var(--muted);font-size:12px;text-align:center;margin:18px 0 8px}
+  @media (min-width:800px){
+    .tiles{grid-template-columns:2fr 1fr 1fr}
+    .tiles > .card:first-child{grid-column:auto}
+    .blocks{grid-template-columns:1fr 1fr 1fr}
+    .v,.big{font-size:30px}
+    .chart{height:220px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><h1 id="title">Выручка</h1><div id="updated">загрузка…</div></header>
+  <div class="chips" id="chips"></div>
+  <div class="banner" id="banner"></div>
+
+  <section class="tiles">
+    <div class="card"><div class="l" id="today-l">Сегодня</div><div class="v" id="today-v">—</div><div class="sub" id="today-s"></div></div>
+    <div class="card"><div class="l">7 дней</div><div class="v" id="week-v">—</div><div class="sub" id="week-s"></div></div>
+    <div class="card" id="tile-avg"><div class="l">Средний день, 7 дн.</div><div class="v" id="avg-v">—</div><div class="sub" id="avg-s"></div></div>
+  </section>
+
+  <section class="blocks">
+    <div class="card" id="blk-mtd"></div>
+    <div class="card" id="blk-pm"></div>
+    <div class="card" id="blk-ytd"></div>
+  </section>
+
+  <section class="card">
+    <div class="t"><span>По месяцам</span><span id="months-years"></span></div>
+    <div class="chart" id="chart"></div>
+    <div class="axis">
+      <span>янв</span><span>фев</span><span>мар</span><span>апр</span><span>май</span><span>июн</span>
+      <span>июл</span><span>авг</span><span>сен</span><span>окт</span><span>ноя</span><span>дек</span>
+    </div>
+    <div class="pcts" id="pcts"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <footer>Данные: кассы ОФД · обновляется каждые 15 мин</footer>
+</div>
+
+<script>
+(function () {
+  // Код объекта в data.json → как показывать. Понятные названия живут только здесь.
+  const OBJECTS = [
+    { code: 'p1', name: 'Паасо', active: true },
+    { code: 'w1', name: 'Водопады', active: false },
+    { code: 'all', name: 'Всё', active: false },
+  ];
+  const MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  const MONTHS_NOM = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+  const WEEKDAYS = ['вс','пн','вт','ср','чт','пт','сб'];
+  const STALE_MIN = 60;
+  let current = 'p1';
+  let data = null;
+
+  const $ = (id) => document.getElementById(id);
+  const fmt = (n) => (n === null || n === undefined) ? '—' : Math.round(n).toLocaleString('ru-RU') + ' ₽';
+  const short = (n) => {
+    if (n === null || n === undefined) return '—';
+    if (Math.abs(n) >= 1e6) return (n / 1e6).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + ' млн';
+    if (Math.abs(n) >= 1e3) return Math.round(n / 1e3).toLocaleString('ru-RU') + ' тыс.';
+    return Math.round(n).toLocaleString('ru-RU');
+  };
+  const pctHtml = (p) => {
+    if (p === null || p === undefined) return '<span class="na">—</span>';
+    if (p > 0) return `<span class="up">▲ ${p}%</span>`;
+    if (p < 0) return `<span class="dn">▼ ${Math.abs(p)}%</span>`;
+    return '<span class="na">0%</span>';
+  };
+  const d = (iso) => { const [y, m, dd] = iso.split('-').map(Number); return new Date(y, m - 1, dd); };
+  const dayLabel = (iso) => { const x = d(iso); return `${WEEKDAYS[x.getDay()]}, ${x.getDate()} ${MONTHS_GEN[x.getMonth()]}`; };
+  const rangeLabel = (a, b) => { const x = d(a), y = d(b);
+    return x.getMonth() === y.getMonth() ? `${x.getDate()}–${y.getDate()} ${MONTHS_GEN[y.getMonth()]}`
+      : `${x.getDate()} ${MONTHS_GEN[x.getMonth()]} – ${y.getDate()} ${MONTHS_GEN[y.getMonth()]}`; };
+
+  function cmpBlock(title, range, b, prevLabel) {
+    const max = Math.max(b.value || 0, b.prev || 0, 1);
+    const w = (v) => (v === null || v === undefined) ? 0 : Math.max(2, Math.round(v / max * 100));
+    const prevRow = (b.prev === null || b.prev === undefined)
+      ? `<div class="row"><span>${prevLabel}</span><b class="na">нет данных</b></div>`
+      : `<div class="row"><span>${prevLabel}</span><b>${short(b.prev)}</b></div><div class="bar" style="width:${w(b.prev)}%"></div>`;
+    return `<div class="t"><span>${title}</span><span>${range}</span></div>
+      <div class="cmp"><div class="pair">
+        <div class="row"><span>${new Date().getFullYear()}</span><b>${short(b.value)}</b></div><div class="bar cur" style="width:${w(b.value)}%"></div>
+        ${prevRow}
+      </div><div class="big">${pctHtml(b.pct)}</div></div>`;
+  }
+
+  function render() {
+    const o = data && data.objects && data.objects[current];
+    if (!o) { $('banner').textContent = 'Нет данных по этому объекту'; $('banner').classList.add('show'); return; }
+    const year = d(o.today.date).getFullYear(), prevYear = year - 1;
+    const name = OBJECTS.find(x => x.code === current).name;
+    $('title').textContent = 'Выручка · ' + name;
+    document.title = 'Выручка · ' + name;
+
+    // сегодня / 7 дней / средний день
+    $('today-l').textContent = 'Сегодня · ' + dayLabel(o.today.date);
+    $('today-v').textContent = fmt(o.today.value);
+    $('today-s').innerHTML = `${pctHtml(o.today.pct)} к ${dayLabel(o.today.prev_date)} ${prevYear}` + (o.today.complete ? '' : ' <span class="dn">⚠</span>');
+    $('week-v').textContent = short(o.week7.value);
+    $('week-s').innerHTML = `${pctHtml(o.week7.pct)} к тем же дням ${prevYear} · ${rangeLabel(o.week7.from, o.week7.to)}`;
+    $('avg-v').textContent = short(o.week7.avg_day);
+    $('avg-s').textContent = o.week7.prev_avg_day === null ? '' : `в ${prevYear} — ${short(o.week7.prev_avg_day)}`;
+
+    // три сравнения
+    $('blk-mtd').innerHTML = cmpBlock('Месяц в моменте', rangeLabel(o.mtd.from, o.mtd.to), o.mtd, String(prevYear));
+    const pm = o.prev_month.month.split('-'); const pmName = MONTHS_NOM[Number(pm[1]) - 1];
+    $('blk-pm').innerHTML = cmpBlock('Прошлый месяц', pmName, o.prev_month, `${pmName} ${Number(pm[0]) - 1}`);
+    $('blk-ytd').innerHTML = cmpBlock('Год в моменте', rangeLabel(o.ytd.from, o.ytd.to), o.ytd, String(prevYear));
+
+    // по месяцам
+    $('months-years').textContent = `${year} / ${prevYear} · % год к году`;
+    const max = Math.max(1, ...o.months.flatMap(m => [m.cur || 0, m.prev || 0]));
+    $('chart').innerHTML = o.months.map(m => {
+      const h = (v) => (v === null || v === undefined) ? 0 : Math.max(v > 0 ? 1 : 0, Math.round(v / max * 100));
+      return `<div class="m" title="${MONTHS_NOM[m.m - 1]}: ${fmt(m.cur)} / ${fmt(m.prev)}"><i style="height:${h(m.cur)}%"></i><i class="p" style="height:${h(m.prev)}%"></i></div>`;
+    }).join('');
+    $('pcts').innerHTML = o.months.map(m => pctHtml(m.pct)).join('');
+    $('legend').innerHTML = `<span><b style="background:var(--cur)"></b>${year}</span><span><b style="background:var(--prev)"></b>${prevYear}</span>`;
+
+    // время обновления и плашки
+    const gen = new Date(data.generated_at);
+    $('updated').textContent = 'обновлено ' + gen.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ' · ' + gen.getDate() + ' ' + MONTHS_GEN[gen.getMonth()];
+    const msgs = [];
+    const ageMin = (Date.now() - gen.getTime()) / 60000;
+    if (ageMin > STALE_MIN) msgs.push('данные не обновлялись с ' + gen.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ' — цифры за сегодня могут отставать');
+    if (!o.today.complete) msgs.push('данные за сегодня могут быть неполными (одна из касс не ответила)');
+    $('banner').textContent = msgs.join(' · ');
+    $('banner').classList.toggle('show', msgs.length > 0);
+  }
+
+  function renderChips() {
+    $('chips').innerHTML = OBJECTS.map(x =>
+      `<button class="chip${x.code === current ? ' on' : ''}" data-code="${x.code}" ${x.active ? '' : 'disabled title="скоро"'}>${x.name}</button>`).join('');
+    $('chips').querySelectorAll('button:not(:disabled)').forEach(b => b.onclick = () => { current = b.dataset.code; renderChips(); render(); });
+  }
+
+  async function load() {
+    try {
+      const r = await fetch('data.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status);
+      data = await r.json();
+      render();
+    } catch (e) {
+      $('updated').textContent = 'нет связи с данными';
+      $('banner').textContent = 'Не удалось загрузить data.json — попробуй обновить страницу';
+      $('banner').classList.add('show');
+    }
+  }
+
+  renderChips();
+  load();
+  setInterval(load, 5 * 60 * 1000);
+})();
+</script>
+</body>
+</html>
