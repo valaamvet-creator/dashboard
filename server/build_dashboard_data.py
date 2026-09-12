@@ -43,6 +43,8 @@ def main() -> int:
     if not dump:
         warnings.append("sync_dump_missing")
     elif dump_updated is not None:
+        if dump_updated.tzinfo is None:
+            dump_updated = dump_updated.replace(tzinfo=MSK)
         age_min = (now - dump_updated.astimezone(MSK)).total_seconds() / 60
         if age_min > args.max_dump_age_min:
             warnings.append("sync_dump_stale")
