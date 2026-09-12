@@ -58,6 +58,10 @@
     .v,.big{font-size:30px}
     .chart{height:220px}
   }
+  @media (max-width:799px){
+    header{flex-wrap:wrap}
+    #updated{white-space:normal}
+  }
 </style>
 </head>
 <body>
@@ -127,15 +131,15 @@
     return x.getMonth() === y.getMonth() ? `${x.getDate()}–${y.getDate()} ${MONTHS_GEN[y.getMonth()]}`
       : `${x.getDate()} ${MONTHS_GEN[x.getMonth()]} – ${y.getDate()} ${MONTHS_GEN[y.getMonth()]}`; };
 
-  function cmpBlock(title, range, b, prevLabel) {
+  function cmpBlock(title, range, b, curLabel, prevLabel) {
     const max = Math.max(b.value || 0, b.prev || 0, 1);
-    const w = (v) => (v === null || v === undefined) ? 0 : Math.max(2, Math.round(v / max * 100));
+    const w = (v) => (v === null || v === undefined || v === 0) ? 0 : Math.max(2, Math.round(v / max * 100));
     const prevRow = (b.prev === null || b.prev === undefined)
       ? `<div class="row"><span>${prevLabel}</span><b class="na">нет данных</b></div>`
       : `<div class="row"><span>${prevLabel}</span><b>${short(b.prev)}</b></div><div class="bar" style="width:${w(b.prev)}%"></div>`;
     return `<div class="t"><span>${title}</span><span>${range}</span></div>
       <div class="cmp"><div class="pair">
-        <div class="row"><span>${new Date().getFullYear()}</span><b>${short(b.value)}</b></div><div class="bar cur" style="width:${w(b.value)}%"></div>
+        <div class="row"><span>${curLabel}</span><b>${short(b.value)}</b></div><div class="bar cur" style="width:${w(b.value)}%"></div>
         ${prevRow}
       </div><div class="big">${pctHtml(b.pct)}</div></div>`;
   }
@@ -155,13 +159,13 @@
     $('week-v').textContent = short(o.week7.value);
     $('week-s').innerHTML = `${pctHtml(o.week7.pct)} к тем же дням ${prevYear} · ${rangeLabel(o.week7.from, o.week7.to)}`;
     $('avg-v').textContent = short(o.week7.avg_day);
-    $('avg-s').textContent = o.week7.prev_avg_day === null ? '' : `в ${prevYear} — ${short(o.week7.prev_avg_day)}`;
+    $('avg-s').innerHTML = `${pctHtml(o.week7.pct)}` + (o.week7.prev_avg_day === null ? '' : ` в ${prevYear} — ${short(o.week7.prev_avg_day)}`);
 
     // три сравнения
-    $('blk-mtd').innerHTML = cmpBlock('Месяц в моменте', rangeLabel(o.mtd.from, o.mtd.to), o.mtd, String(prevYear));
+    $('blk-mtd').innerHTML = cmpBlock('Месяц в моменте', rangeLabel(o.mtd.from, o.mtd.to), o.mtd, String(year), String(prevYear));
     const pm = o.prev_month.month.split('-'); const pmName = MONTHS_NOM[Number(pm[1]) - 1];
-    $('blk-pm').innerHTML = cmpBlock('Прошлый месяц', pmName, o.prev_month, `${pmName} ${Number(pm[0]) - 1}`);
-    $('blk-ytd').innerHTML = cmpBlock('Год в моменте', rangeLabel(o.ytd.from, o.ytd.to), o.ytd, String(prevYear));
+    $('blk-pm').innerHTML = cmpBlock('Прошлый месяц', pmName, o.prev_month, pm[0], `${pmName} ${Number(pm[0]) - 1}`);
+    $('blk-ytd').innerHTML = cmpBlock('Год в моменте', rangeLabel(o.ytd.from, o.ytd.to), o.ytd, String(year), String(prevYear));
 
     // по месяцам
     $('months-years').textContent = `${year} / ${prevYear} · % год к году`;
