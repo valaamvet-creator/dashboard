@@ -45,3 +45,10 @@ def write_daily_series_dump(path: Path, paaso_day_cash: dict, paaso_night_cash: 
 (`waterfalls_today_stats["method"]`); для прошлых дней — `true`.
 Вызов в `main()` передаёт `waterfalls_main_cash`, `waterfalls_second_cash` и вычисленный `waterfalls_today_complete`.
 Бэкап до правки: `/root/sync_paaso_before_wf_patch.py`.
+
+## Крон (12.09.2026, объект v1)
+
+В `hourly_update_paaso_revenue_summary.sh` перед сборкой data.json добавлен шаг
+`python3 -m server.fetch_sheet_daily --spreadsheet-id <таблица v1> --out revenue_sources/vashun_daily_sheet.csv`;
+его код возврата передаётся сборщику как `--vashun-sheet-status` и пишется в `dashboard_status.env`.
+Бэкап до правки: `/root/hourly_update_before_v1.sh`.
