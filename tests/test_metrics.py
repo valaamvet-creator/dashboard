@@ -117,16 +117,20 @@ class MonthYear(unittest.TestCase):
 
 
 class Payload(unittest.TestCase):
-    def test_shape(self):
+    def test_shape_multi_object(self):
         s = flat(D(2025, 1, 1), D(2026, 9, 11), 100)
+        w = flat(D(2025, 1, 1), D(2026, 9, 11), 10)
         gen = dt.datetime(2026, 9, 11, 22, 50, 39, tzinfo=dt.timezone(dt.timedelta(hours=3)))
-        p = build_payload(s, D(2026, 9, 11), gen, ["night_fetch_failed"])
+        p = build_payload({"p1": s, "w1": w}, D(2026, 9, 11), gen, {"p1": ["night_fetch_failed"], "w1": []})
         self.assertEqual(p["generated_at"], "2026-09-11T22:50:39+03:00")
-        self.assertEqual(set(p["objects"]), {"p1"})
-        o = p["objects"]["p1"]
-        self.assertEqual(set(o), {"today", "week7", "mtd", "prev_month", "ytd", "months", "warnings"})
-        self.assertEqual(o["warnings"], ["night_fetch_failed"])
-        self.assertIsInstance(o["today"]["value"], int)
+        self.assertEqual(list(p["objects"]), ["p1", "w1"])
+        for code in ("p1", "w1"):
+            self.assertEqual(set(p["objects"][code]), {"today", "week7", "mtd", "prev_month", "ytd", "months", "warnings"})
+        self.assertEqual(p["objects"]["p1"]["warnings"], ["night_fetch_failed"])
+        self.assertEqual(p["objects"]["w1"]["warnings"], [])
+        self.assertEqual(p["objects"]["p1"]["today"]["value"], 100)
+        self.assertEqual(p["objects"]["w1"]["today"]["value"], 10)
+        self.assertIsInstance(p["objects"]["p1"]["today"]["value"], int)
 
 
 if __name__ == "__main__":

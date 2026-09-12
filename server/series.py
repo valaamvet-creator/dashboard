@@ -24,6 +24,13 @@ class DayValue:
         return self.day + self.night
 
 
+@dataclass(frozen=True)
+class DayTotal:
+    """Дневная выручка объекта без разбивки по кассам (Водопады, «Всё»)."""
+    total: float = 0.0
+    complete: bool = True
+
+
 def parse_day(value: Optional[str]) -> Optional[dt.date]:
     value = (value or "").strip()
     if len(value) < 10:
@@ -106,4 +113,41 @@ def merge_series(
     for d in set(day) | set(night):
         result[d] = DayValue(day.get(d, 0.0), night.get(d, 0.0), True)
     result.update(dump)
+    return result
+
+
+def read_waterfalls_csv(path: Path) -> Dict[dt.date, DayTotal]:
+    """Статичный дневной ряд объекта w1 (2025): колонки date,cash_1,cash_2,total."""
+    if not path.exists():
+        return {}
+    result: Dict[dt.date, DayTotal] = {}
+    with path.open(encoding="utf-8", newline="") as f:
+        for row in csv.DictReader(f):
+            day = parse_day(row.get("date"))
+            if not day:
+                continue
+            result[day] = DayTotal(_num(row.get("total")), True)
+    return result
+
+
+def read_waterfalls_dump(path: Path) -> Dict[dt.date, DayTotal]:
+    """Ряд объекта w1 из дампа sync-скрипта: поля wf1, wf2, wf_complete (дни без них пропускаются)."""
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8"))
+    result: Dict[dt.date, DayTotal] = {}
+    for key, v in (data.get("days") or {}).items():
+        day = parse_day(key)
+        if not day or not isinstance(v, dict) or "wf1" not in v:
+            continue
+        result[day] = DayTotal(float(v.get("wf1") or 0) + float(v.get("wf2") or 0), bool(v.get("wf_complete", True)))
+    return result
+
+
+def sum_series(a: Dict[dt.date, object], b: Dict[dt.date, object]) -> Dict[dt.date, DayTotal]:
+    """Объект «Всё»: сумма двух рядов по датам; день полный, только если полны оба слагаемых."""
+    result: Dict[dt.date, DayTotal] = {}
+    for d in set(a) | set(b):
+        parts = [x for x in (a.get(d), b.get(d)) if x is not None]
+        result[d] = DayTotal(sum(x.total for x in parts), all(x.complete for x in parts))
     return result

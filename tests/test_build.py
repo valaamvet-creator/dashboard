@@ -19,6 +19,7 @@ def run(*extra: str, sync_dump: Path | None = None, max_dump_age_min: int | None
         cmd = [sys.executable, "-m", "server.build_dashboard_data",
                "--day-z", str(FX / "day_z.csv"), "--night-sell", str(FX / "night_sell.csv"),
                "--sync-dump", str(sync_dump_path), "--out", str(out),
+               "--waterfalls-csv", str(FX / "wf_daily_2025.csv"),
                "--today", "2026-09-11"]
         if max_dump_age_min is None:
             cmd.extend(["--max-dump-age-min", "999999"])
@@ -31,6 +32,29 @@ def run(*extra: str, sync_dump: Path | None = None, max_dump_age_min: int | None
 
 
 class Build(unittest.TestCase):
+    def test_waterfalls_object_from_dump_and_csv(self):
+        data, report = run()
+        w = data["objects"]["w1"]
+        self.assertEqual(w["today"]["value"], 348750)           # wf1+wf2 из дампа
+        self.assertFalse(w["today"]["complete"])                # wf_complete=false
+        self.assertEqual(w["today"]["prev"], 7000)              # 2025-09-12 из CSV (−364 дня)
+        self.assertIn("today_incomplete", w["warnings"])
+        self.assertNotIn("night_fetch_failed", w["warnings"])   # ночная касса — только Паасо
+
+    def test_all_object_is_sum_of_p1_and_w1(self):
+        data, _ = run()
+        p1, w1, a = (data["objects"][k] for k in ("p1", "w1", "all"))
+        self.assertEqual(a["today"]["value"], p1["today"]["value"] + w1["today"]["value"])   # 243350 + 348750
+        self.assertEqual(a["today"]["prev"], 7000)              # у Паасо prev нет → берём только Водопады
+        self.assertFalse(a["today"]["complete"])
+        self.assertEqual(list(data["objects"]), ["p1", "w1", "all"])
+
+    def test_night_fetch_failure_marks_p1_and_all_incomplete_only(self):
+        data, _ = run("--night-fetch-status", "1")
+        self.assertFalse(data["objects"]["p1"]["today"]["complete"])
+        self.assertFalse(data["objects"]["all"]["today"]["complete"])
+        self.assertIn("night_fetch_failed", data["objects"]["all"]["warnings"])
+
     def test_writes_payload_from_fixtures(self):
         data, report = run()
         o = data["objects"]["p1"]

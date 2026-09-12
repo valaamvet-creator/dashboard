@@ -102,15 +102,16 @@
 (function () {
   // Код объекта в data.json → как показывать. Понятные названия живут только здесь.
   const OBJECTS = [
-    { code: 'p1', name: 'Паасо', active: true },
-    { code: 'w1', name: 'Водопады', active: false },
-    { code: 'all', name: 'Всё', active: false },
+    { code: 'p1', name: 'Паасо', active: true, nightNote: true },
+    { code: 'w1', name: 'Водопады', active: true, nightNote: false },
+    { code: 'all', name: 'Всё', active: true, nightNote: true },
   ];
   const MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
   const MONTHS_NOM = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
   const WEEKDAYS = ['вс','пн','вт','ср','чт','пт','сб'];
   const STALE_MIN = 60;
   let current = 'p1';
+  try { const saved = localStorage.getItem('dash-object'); if (OBJECTS.some(x => x.code === saved && x.active)) current = saved; } catch (e) {}
   let data = null;
 
   const $ = (id) => document.getElementById(id);
@@ -150,7 +151,8 @@
     const o = data && data.objects && data.objects[current];
     if (!o) { $('banner').textContent = 'Нет данных по этому объекту'; $('banner').classList.add('show'); return; }
     const year = d(o.today.date).getFullYear(), prevYear = year - 1;
-    const name = OBJECTS.find(x => x.code === current).name;
+    const obj = OBJECTS.find(x => x.code === current);
+    const name = obj.name;
     $('title').textContent = 'Выручка · ' + name;
     document.title = 'Выручка · ' + name;
 
@@ -178,7 +180,7 @@
     }).join('');
     $('pcts').innerHTML = o.months.map(m => pctHtml(m.pct)).join('');
     $('legend').innerHTML = `<span><b style="background:var(--cur)"></b>${year}</span><span><b style="background:var(--prev)"></b>${prevYear}</span>`;
-    $('note').textContent = (o.months[0].prev !== null && prevYear === 2025)
+    $('note').textContent = (obj.nightNote && o.months[0].prev !== null && prevYear === 2025)
       ? '* январь 2025: ночная касса учтена с 20 января' : '';
 
     // время обновления и плашки
@@ -195,7 +197,7 @@
   function renderChips() {
     $('chips').innerHTML = OBJECTS.map(x =>
       `<button class="chip${x.code === current ? ' on' : ''}" data-code="${x.code}" ${x.active ? '' : 'disabled title="скоро"'}>${x.name}</button>`).join('');
-    $('chips').querySelectorAll('button:not(:disabled)').forEach(b => b.onclick = () => { current = b.dataset.code; renderChips(); render(); });
+    $('chips').querySelectorAll('button:not(:disabled)').forEach(b => b.onclick = () => { current = b.dataset.code; try { localStorage.setItem('dash-object', current); } catch (e) {} renderChips(); render(); });
   }
 
   async function load() {

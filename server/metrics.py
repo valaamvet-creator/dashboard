@@ -133,18 +133,26 @@ def months_block(series: Series, today: dt.date) -> List[dict]:
     return out
 
 
-def build_payload(series: Series, today: dt.date, generated_at: dt.datetime, warnings: List[str]) -> dict:
+def object_block(series: Series, today: dt.date, warnings: List[str]) -> dict:
+    return {
+        "today": today_block(series, today),
+        "week7": week7_block(series, today),
+        "mtd": mtd_block(series, today),
+        "prev_month": prev_month_block(series, today),
+        "ytd": ytd_block(series, today),
+        "months": months_block(series, today),
+        "warnings": list(warnings),
+    }
+
+
+def build_payload(
+    objects: Dict[str, Series],
+    today: dt.date,
+    generated_at: dt.datetime,
+    warnings: Dict[str, List[str]],
+) -> dict:
+    """data.json: по блоку на каждый объект (коды p1, w1, all); имена объектов живут только в index.html."""
     return {
         "generated_at": generated_at.isoformat(timespec="seconds"),
-        "objects": {
-            "p1": {
-                "today": today_block(series, today),
-                "week7": week7_block(series, today),
-                "mtd": mtd_block(series, today),
-                "prev_month": prev_month_block(series, today),
-                "ytd": ytd_block(series, today),
-                "months": months_block(series, today),
-                "warnings": list(warnings),
-            }
-        },
+        "objects": {code: object_block(series, today, warnings.get(code, [])) for code, series in objects.items()},
     }

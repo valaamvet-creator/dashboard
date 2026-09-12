@@ -51,3 +51,36 @@ class Merge(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Waterfalls(unittest.TestCase):
+    def test_read_waterfalls_csv_sums_two_registers(self):
+        from server.series import DayTotal, read_waterfalls_csv
+        s = read_waterfalls_csv(FX / "wf_daily_2025.csv")
+        self.assertEqual(s[dt.date(2025, 9, 11)], DayTotal(8000.0, True))
+        self.assertEqual(s[dt.date(2025, 9, 12)], DayTotal(7000.0, True))
+        self.assertEqual(read_waterfalls_csv(FX / "nope.csv"), {})
+
+    def test_read_waterfalls_dump_uses_wf_fields(self):
+        from server.series import DayTotal, read_waterfalls_dump
+        s = read_waterfalls_dump(FX / "sync_dump.json")
+        self.assertEqual(s[dt.date(2026, 9, 10)], DayTotal(336050.0, True))
+        self.assertEqual(s[dt.date(2026, 9, 11)], DayTotal(348750.0, False))
+
+    def test_read_waterfalls_dump_skips_days_without_wf(self):
+        from server.series import read_waterfalls_dump
+        import json, tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "d.json"
+            p.write_text(json.dumps({"updated_at": "2026-09-11T22:50:39+03:00",
+                                     "days": {"2026-09-10": {"day": 1, "night": 2, "complete": True}}}), encoding="utf-8")
+            self.assertEqual(read_waterfalls_dump(p), {})
+
+    def test_sum_series_adds_totals_and_ands_complete(self):
+        from server.series import DayTotal, sum_series
+        a = {dt.date(2026, 9, 10): DayValue(100.0, 10.0, True), dt.date(2026, 9, 11): DayValue(50.0, 0.0, False)}
+        b = {dt.date(2026, 9, 10): DayTotal(1000.0, True), dt.date(2026, 9, 12): DayTotal(7.0, True)}
+        s = sum_series(a, b)
+        self.assertEqual(s[dt.date(2026, 9, 10)], DayTotal(1110.0, True))
+        self.assertEqual(s[dt.date(2026, 9, 11)], DayTotal(50.0, False))   # только a, complete=False
+        self.assertEqual(s[dt.date(2026, 9, 12)], DayTotal(7.0, True))     # только b
