@@ -12,8 +12,8 @@ import sys
 from pathlib import Path
 
 from .metrics import build_payload
-from .series import (merge_series, read_day_z, read_night_sell, read_sync_dump,
-                     read_waterfalls_csv, read_waterfalls_dump, sum_series)
+from .series import (merge_series, read_daily_total_csv, read_day_z, read_night_sell, read_sync_dump,
+                     read_waterfalls_dump, sum_series)
 
 MSK = dt.timezone(dt.timedelta(hours=3))
 WS = Path("/root/.openclaw/workspace/revenue_sources")
@@ -26,6 +26,12 @@ def main() -> int:
     ap.add_argument("--sync-dump", default=str(WS / "paaso_daily_series.json"))
     ap.add_argument("--waterfalls-csv", default=str(WS / "waterfalls_daily_2025.csv"),
                     help="Статичный дневной ряд объекта w1 за прошлые годы")
+    ap.add_argument("--vashun-history-csv", default=str(WS / "vashun_daily_history.csv"),
+                    help="Статичный дневной ряд объекта v1 (2025 и начало 2026)")
+    ap.add_argument("--vashun-sheet-csv", default=str(WS / "vashun_daily_sheet.csv"),
+                    help="Дневной ряд v1 из Google-таблицы (пишет fetch_sheet_daily.py)")
+    ap.add_argument("--vashun-sheet-status", type=int, default=0,
+                    help="Код возврата fetch_sheet_daily.py в этом тике (≠0 — сегодня v1 неполный)")
     ap.add_argument("--out", default=str(WS / "dashboard_data.json"))
     ap.add_argument("--today", help="YYYY-MM-DD (по умолчанию — сегодня по Москве)")
     ap.add_argument("--night-fetch-status", type=int, default=0)
@@ -39,30 +45,37 @@ def main() -> int:
     night = read_night_sell(Path(args.night_sell))
     dump, dump_updated = read_sync_dump(Path(args.sync_dump))
     p1 = merge_series(day, night, dump)
-    w1 = read_waterfalls_csv(Path(args.waterfalls_csv))
+    w1 = read_daily_total_csv(Path(args.waterfalls_csv))
     w1.update(read_waterfalls_dump(Path(args.sync_dump)))
-    objects = {"p1": p1, "w1": w1, "all": sum_series(p1, w1)}
+    v1 = read_daily_total_csv(Path(args.vashun_history_csv))
+    v1.update(read_daily_total_csv(Path(args.vashun_sheet_csv)))
+    objects = {"p1": p1, "w1": w1, "v1": v1, "all": sum_series(sum_series(p1, w1), v1)}
 
-    # Предупреждения источника данных — общие для всех объектов; ночная касса — только Паасо и «Всё».
-    common = []
+    # Предупреждения по источникам. Дамп sync-скрипта → p1 и w1; ночная касса → p1; таблица → v1; «Всё» — всё вместе.
+    dump_warnings = []
     if not dump:
-        common.append("sync_dump_missing")
+        dump_warnings.append("sync_dump_missing")
     elif dump_updated is None:
-        common.append("sync_dump_stale")
+        dump_warnings.append("sync_dump_stale")
     else:
         if dump_updated.tzinfo is None:
             dump_updated = dump_updated.replace(tzinfo=MSK)
         age_min = (now - dump_updated.astimezone(MSK)).total_seconds() / 60
         if age_min > args.max_dump_age_min:
-            common.append("sync_dump_stale")
-    night_failed = args.night_fetch_status != 0
-    warnings = {code: list(common) + (["night_fetch_failed"] if night_failed and code != "w1" else [])
-                for code in objects}
+            dump_warnings.append("sync_dump_stale")
+    night_warnings = ["night_fetch_failed"] if args.night_fetch_status != 0 else []
+    sheet_warnings = ["vashun_sheet_failed"] if args.vashun_sheet_status != 0 else []
+    warnings = {
+        "p1": dump_warnings + night_warnings,
+        "w1": list(dump_warnings),
+        "v1": list(sheet_warnings),
+    }
+    warnings["all"] = warnings["p1"] + [w for w in warnings["w1"] if w not in warnings["p1"]] + warnings["v1"]
 
     payload = build_payload(objects, today, now, warnings)
     for code, block in payload["objects"].items():
         tb = block["today"]
-        if common or (night_failed and code != "w1"):
+        if warnings[code]:
             tb["complete"] = False
         if not tb["complete"]:
             block["warnings"].append("today_incomplete")
@@ -79,6 +92,7 @@ def main() -> int:
         "today": today.isoformat(),
         "today_value": payload["objects"]["p1"]["today"]["value"],
         "w1_today_value": payload["objects"]["w1"]["today"]["value"],
+        "v1_today_value": payload["objects"]["v1"]["today"]["value"],
         "out_rows_days": len(p1),
         "warnings": payload["objects"]["p1"]["warnings"],
     }, ensure_ascii=False))

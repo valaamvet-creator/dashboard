@@ -116,8 +116,8 @@ def merge_series(
     return result
 
 
-def read_waterfalls_csv(path: Path) -> Dict[dt.date, DayTotal]:
-    """Статичный дневной ряд объекта w1 (2025): колонки date,cash_1,cash_2,total."""
+def read_daily_total_csv(path: Path) -> Dict[dt.date, DayTotal]:
+    """Дневной ряд объекта из CSV с колонками date,total (остальные колонки игнорируются)."""
     if not path.exists():
         return {}
     result: Dict[dt.date, DayTotal] = {}
@@ -151,3 +151,6 @@ def sum_series(a: Dict[dt.date, object], b: Dict[dt.date, object]) -> Dict[dt.da
         parts = [x for x in (a.get(d), b.get(d)) if x is not None]
         result[d] = DayTotal(sum(x.total for x in parts), all(x.complete for x in parts))
     return result
+
+
+read_waterfalls_csv = read_daily_total_csv  # старое имя

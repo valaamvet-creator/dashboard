@@ -20,6 +20,7 @@ def run(*extra: str, sync_dump: Path | None = None, max_dump_age_min: int | None
                "--day-z", str(FX / "day_z.csv"), "--night-sell", str(FX / "night_sell.csv"),
                "--sync-dump", str(sync_dump_path), "--out", str(out),
                "--waterfalls-csv", str(FX / "wf_daily_2025.csv"),
+               "--vashun-history-csv", str(FX / "v1_history.csv"), "--vashun-sheet-csv", str(FX / "v1_sheet.csv"),
                "--today", "2026-09-11"]
         if max_dump_age_min is None:
             cmd.extend(["--max-dump-age-min", "999999"])
@@ -41,13 +42,28 @@ class Build(unittest.TestCase):
         self.assertIn("today_incomplete", w["warnings"])
         self.assertNotIn("night_fetch_failed", w["warnings"])   # ночная касса — только Паасо
 
-    def test_all_object_is_sum_of_p1_and_w1(self):
+    def test_vashun_object_from_history_and_sheet(self):
         data, _ = run()
-        p1, w1, a = (data["objects"][k] for k in ("p1", "w1", "all"))
-        self.assertEqual(a["today"]["value"], p1["today"]["value"] + w1["today"]["value"])   # 243350 + 348750
-        self.assertEqual(a["today"]["prev"], 7000)              # у Паасо prev нет → берём только Водопады
-        self.assertFalse(a["today"]["complete"])
-        self.assertEqual(list(data["objects"]), ["p1", "w1", "all"])
+        v = data["objects"]["v1"]
+        self.assertEqual(v["today"]["value"], 461730)           # из CSV таблицы
+        self.assertTrue(v["today"]["complete"])                 # статус чтения таблицы 0
+        self.assertEqual(v["today"]["prev"], 30000)             # 2025-09-12 из истории
+        self.assertEqual(v["warnings"], [])                     # дамп/ночная касса к v1 не относятся
+
+    def test_vashun_sheet_failure_marks_v1_and_all_incomplete(self):
+        data, _ = run("--vashun-sheet-status", "1")
+        self.assertFalse(data["objects"]["v1"]["today"]["complete"])
+        self.assertIn("vashun_sheet_failed", data["objects"]["v1"]["warnings"])
+        self.assertIn("vashun_sheet_failed", data["objects"]["all"]["warnings"])
+        self.assertNotIn("vashun_sheet_failed", data["objects"]["w1"]["warnings"])
+
+    def test_all_object_is_sum_of_three(self):
+        data, _ = run()
+        p1, w1, v1, a = (data["objects"][k] for k in ("p1", "w1", "v1", "all"))
+        self.assertEqual(a["today"]["value"], p1["today"]["value"] + w1["today"]["value"] + v1["today"]["value"])
+        self.assertEqual(a["today"]["prev"], 7000 + 30000)      # у Паасо prev нет
+        self.assertFalse(a["today"]["complete"])                # Паасо и Водопады неполные
+        self.assertEqual(list(data["objects"]), ["p1", "w1", "v1", "all"])
 
     def test_night_fetch_failure_marks_p1_and_all_incomplete_only(self):
         data, _ = run("--night-fetch-status", "1")
