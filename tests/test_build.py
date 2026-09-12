@@ -66,6 +66,31 @@ class Build(unittest.TestCase):
             data, _ = run(sync_dump=dump_file, max_dump_age_min=60)
             self.assertIn("sync_dump_stale", data["objects"]["p1"]["warnings"])
 
+    def test_missing_dump_marks_today_incomplete(self):
+        data, _ = run(sync_dump=FX / "nope.json")
+        o = data["objects"]["p1"]
+        self.assertIn("sync_dump_missing", o["warnings"])
+        self.assertFalse(o["today"]["complete"])
+
+    def test_stale_dump_marks_today_incomplete(self):
+        # База уже содержит complete:false для сегодня — подменяем на true, чтобы
+        # проверка действительно упиралась в устаревший дамп, а не в исходные данные.
+        MSK = dt.timezone(dt.timedelta(hours=3))
+        with tempfile.TemporaryDirectory() as tmp:
+            original = json.loads((FX / "sync_dump.json").read_text(encoding="utf-8"))
+            original["days"]["2026-09-11"]["complete"] = True
+            now_msk = dt.datetime.now(MSK)
+            old_naive = (now_msk - dt.timedelta(minutes=90)).replace(tzinfo=None)
+            original["updated_at"] = old_naive.isoformat(timespec="seconds")
+
+            dump_file = Path(tmp) / "dump.json"
+            dump_file.write_text(json.dumps(original, ensure_ascii=False), encoding="utf-8")
+
+            data, _ = run(sync_dump=dump_file, max_dump_age_min=60)
+            o = data["objects"]["p1"]
+            self.assertIn("sync_dump_stale", o["warnings"])
+            self.assertFalse(o["today"]["complete"])
+
     def test_naive_updated_at_fresh(self):
         # Naive timestamp = now in MSK, treated as MSK (not UTC).
         # With max_dump_age_min=60, should NOT detect as stale.

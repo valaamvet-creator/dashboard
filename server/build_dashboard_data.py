@@ -42,7 +42,9 @@ def main() -> int:
         warnings.append("night_fetch_failed")
     if not dump:
         warnings.append("sync_dump_missing")
-    elif dump_updated is not None:
+    elif dump_updated is None:
+        warnings.append("sync_dump_stale")
+    else:
         if dump_updated.tzinfo is None:
             dump_updated = dump_updated.replace(tzinfo=MSK)
         age_min = (now - dump_updated.astimezone(MSK)).total_seconds() / 60
@@ -52,6 +54,8 @@ def main() -> int:
     payload = build_payload(series, today, now, warnings)
     tb = payload["objects"]["p1"]["today"]
     if args.night_fetch_status != 0:
+        tb["complete"] = False
+    if "sync_dump_missing" in warnings or "sync_dump_stale" in warnings:
         tb["complete"] = False
     if not tb["complete"] and "today_incomplete" not in warnings:
         warnings.append("today_incomplete")

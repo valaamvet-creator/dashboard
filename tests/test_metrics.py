@@ -109,6 +109,8 @@ class MonthYear(unittest.TestCase):
         self.assertEqual(len(ms), 12)
         self.assertEqual(ms[0], {"m": 1, "cur": 3100, "prev": 2480, "pct": 25})
         self.assertEqual(ms[8]["cur"], 1100)     # сентябрь — в моменте
+        # Текущий месяц: prev/pct — по сопоставимым датам (как MTD), а не за весь прошлый сентябрь.
+        self.assertEqual(ms[8], {"m": 9, "cur": 1100, "prev": 880, "pct": 25})
         self.assertIsNone(ms[9]["cur"])          # октябрь ещё не наступил
         self.assertEqual(ms[9]["prev"], 31 * 80)
         self.assertIsNone(ms[9]["pct"])

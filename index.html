@@ -50,6 +50,7 @@
   .axis{color:var(--muted)}
   .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px}
   .legend b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+  .note{font-size:11px;color:var(--muted);margin-top:6px}
   footer{color:var(--muted);font-size:12px;text-align:center;margin:18px 0 8px}
   @media (min-width:800px){
     .tiles{grid-template-columns:2fr 1fr 1fr}
@@ -91,6 +92,7 @@
     </div>
     <div class="pcts" id="pcts"></div>
     <div class="legend" id="legend"></div>
+    <div class="note" id="note"></div>
   </section>
 
   <footer>Данные: кассы ОФД · обновляется каждые 15 мин</footer>
@@ -155,7 +157,7 @@
     // сегодня / 7 дней / средний день
     $('today-l').textContent = 'Сегодня · ' + dayLabel(o.today.date);
     $('today-v').textContent = fmt(o.today.value);
-    $('today-s').innerHTML = `${pctHtml(o.today.pct)} к ${dayLabel(o.today.prev_date)} ${prevYear}` + (o.today.complete ? '' : ' <span class="dn">⚠</span>');
+    $('today-s').innerHTML = `${pctHtml(o.today.pct)} к полному дню ${dayLabel(o.today.prev_date)} ${prevYear}` + (o.today.complete ? '' : ' <span class="dn">⚠</span>');
     $('week-v').textContent = short(o.week7.value);
     $('week-s').innerHTML = `${pctHtml(o.week7.pct)} к тем же дням ${prevYear} · ${rangeLabel(o.week7.from, o.week7.to)}`;
     $('avg-v').textContent = short(o.week7.avg_day);
@@ -168,7 +170,7 @@
     $('blk-ytd').innerHTML = cmpBlock('Год в моменте', rangeLabel(o.ytd.from, o.ytd.to), o.ytd, String(year), String(prevYear));
 
     // по месяцам
-    $('months-years').textContent = `${year} / ${prevYear} · % год к году`;
+    $('months-years').textContent = `${year} / ${prevYear} · % год к году · текущий месяц — % за сопоставимые дни`;
     const max = Math.max(1, ...o.months.flatMap(m => [m.cur || 0, m.prev || 0]));
     $('chart').innerHTML = o.months.map(m => {
       const h = (v) => (v === null || v === undefined) ? 0 : Math.max(v > 0 ? 1 : 0, Math.round(v / max * 100));
@@ -176,6 +178,8 @@
     }).join('');
     $('pcts').innerHTML = o.months.map(m => pctHtml(m.pct)).join('');
     $('legend').innerHTML = `<span><b style="background:var(--cur)"></b>${year}</span><span><b style="background:var(--prev)"></b>${prevYear}</span>`;
+    $('note').textContent = (o.months[0].prev !== null && prevYear === 2025)
+      ? '* январь 2025: ночная касса учтена с 20 января' : '';
 
     // время обновления и плашки
     const gen = new Date(data.generated_at);

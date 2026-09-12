@@ -6,12 +6,12 @@
 1. Новый аргумент в `main()` (рядом с `--format`):
 ```python
     parser.add_argument("--daily-series-dump", default="revenue_sources/paaso_daily_series.json",
-                        help="Локальный JSON с дневным рядом Паасо для дашборда")
+                        help="Локальный JSON с дневным рядом объекта p1 для дашборда")
 ```
 2. Новая функция (перед `def main()`):
 ```python
 def write_daily_series_dump(path: Path, paaso_day_cash: dict, paaso_night_cash: dict, today_complete: bool) -> None:
-    """Локальный дамп дневного ряда Паасо (для дашборда). Ошибка здесь не должна ломать синхронизацию."""
+    """Локальный дамп дневного ряда объекта p1 (для дашборда). Ошибка здесь не должна ломать синхронизацию."""
     msk = dt.timezone(dt.timedelta(hours=3))
     today = dt.datetime.now(msk).date()
     days = {}

@@ -115,6 +115,10 @@ def months_block(series: Series, today: dt.date) -> List[dict]:
     for m in range(1, 13):
         start, end = _month_bounds(today.year, m)
         pstart, pend = _month_bounds(today.year - 1, m)
+        if start <= today <= end:
+            # Текущий месяц: % должен считаться по тем же датам, что и «месяц в моменте» (MTD),
+            # иначе на графике проценты для текущего месяца не совпадают с блоком MTD.
+            pend = same_date_prev_year(today)
         prev = sum_range(series, pstart, pend) if has_data(series, pstart, pend) else None
         if start > today:
             cur = None
