@@ -35,8 +35,11 @@ def parse_day(value: Optional[str]) -> Optional[dt.date]:
     value = (value or "").strip()
     if len(value) < 10:
         return None
+    head = value[:10]
+    if head[4] == "." and head[7] == ".":          # 2025.01.01 — так пишет выгрузка чеков Платформы ОФД
+        head = head.replace(".", "-")
     try:
-        return dt.date.fromisoformat(value[:10])
+        return dt.date.fromisoformat(head)
     except ValueError:
         return None
 
@@ -154,3 +157,60 @@ def sum_series(a: Dict[dt.date, object], b: Dict[dt.date, object]) -> Dict[dt.da
 
 
 read_waterfalls_csv = read_daily_total_csv  # старое имя
+
+
+# --- Посетители объекта p1 по билетам в чеках -------------------------------------------------------
+
+TICKET_GROUPS = ("full", "conc", "grp_full", "grp_conc", "extra")
+_EXTRA_WORDS = ("вездеход", "гора", "раутакангус")   # экспериментальные доп. маршруты — не посетители
+
+
+def classify_ticket(name: Optional[str]) -> Optional[str]:
+    """Название позиции чека → группа билета. None — не билет (булка, пустое)."""
+    n = (name or "").strip().lower().lstrip("0123456789. ")
+    if not n:
+        return None
+    if any(w in n for w in _EXTRA_WORDS):
+        return "extra"
+    group = "груп" in n            # «групповой» и опечатка «груповой»
+    conc = "льгот" in n
+    if group:
+        return "grp_conc" if conc else "grp_full"
+    if conc:
+        return "conc"
+    if "билет" in n or "полн" in n:
+        return "full"
+    return None
+
+
+@dataclass(frozen=True)
+class TicketDay:
+    groups: Dict[str, int]
+    complete: bool = True
+
+    @property
+    def total(self) -> int:
+        """Посетители = все билеты, кроме экспериментальных доп. маршрутов."""
+        return sum(v for k, v in self.groups.items() if k != "extra")
+
+
+def _count_tickets(path: Path, acc: Dict[dt.date, Dict[str, int]]) -> None:
+    if not path.exists():
+        return
+    with path.open(encoding="utf-8", newline="") as f:
+        for row in csv.DictReader(f):
+            group = classify_ticket(row.get("name"))
+            day = parse_day(row.get("receiptDate"))
+            if not group or not day:
+                continue
+            sign = -1 if str(row.get("operationType") or "1") in {"2", "3", "PAYBACK", "REFUND"} else 1
+            qty = int(round(_num(row.get("quantity")))) or 1
+            acc.setdefault(day, {g: 0 for g in TICKET_GROUPS})[group] += sign * qty
+
+
+def read_paaso_tickets(day_receipts: Path, night_sell: Path) -> Dict[dt.date, TicketDay]:
+    """Дневные кассы (позиции чеков) + ночной терминал (его билет — полный)."""
+    acc: Dict[dt.date, Dict[str, int]] = {}
+    _count_tickets(day_receipts, acc)
+    _count_tickets(night_sell, acc)
+    return {d: TicketDay(g, True) for d, g in acc.items()}

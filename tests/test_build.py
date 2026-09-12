@@ -21,6 +21,7 @@ def run(*extra: str, sync_dump: Path | None = None, max_dump_age_min: int | None
                "--sync-dump", str(sync_dump_path), "--out", str(out),
                "--waterfalls-csv", str(FX / "wf_daily_2025.csv"),
                "--vashun-history-csv", str(FX / "v1_history.csv"), "--vashun-sheet-csv", str(FX / "v1_sheet.csv"),
+               "--p1-receipts", str(FX / "p1_receipts.csv"),
                "--today", "2026-09-11"]
         if max_dump_age_min is None:
             cmd.extend(["--max-dump-age-min", "999999"])
@@ -63,6 +64,19 @@ class Build(unittest.TestCase):
         a = data["objects"]["all"]["forecast"]
         self.assertEqual(a["year"]["point"], sum(f["year"]["point"] for f in fs if f))
         self.assertIsNone(a["k"])
+
+    def test_p1_people_from_tickets(self):
+        data, _ = run()
+        ppl = data["objects"]["p1"]["people"]
+        self.assertEqual(set(ppl), {"today", "week7", "mtd", "prev_month", "ytd", "months", "warnings", "forecast"})
+        self.assertEqual(ppl["today"]["value"], 6)                # 2+1+1+2 (вездеход не человек)
+        self.assertEqual(ppl["today"]["prev"], 3)                 # 2025-09-12
+        self.assertEqual(ppl["today"]["pct"], 100)
+        g = data["objects"]["p1"]["people_groups"]
+        self.assertEqual(list(g), ["full", "conc", "grp_full", "grp_conc", "extra"])
+        self.assertEqual(g["full"]["today"]["value"], 2)
+        self.assertEqual(g["extra"]["today"]["value"], 1)
+        self.assertNotIn("people", data["objects"]["w1"])          # пока только Паасо
 
     def test_all_object_is_sum_of_three(self):
         data, _ = run()

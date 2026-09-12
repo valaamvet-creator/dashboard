@@ -52,6 +52,19 @@
   .legend b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
   .note{font-size:11px;color:var(--muted);margin-top:6px}
   footer{color:var(--muted);font-size:12px;text-align:center;margin:18px 0 8px}
+  /* режим ₽ / чел. */
+  .mode{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:-6px 0 14px}
+  .mode .chip{padding:4px 12px;font-size:12px}
+  .mode-note{color:var(--muted);font-size:11px;margin-left:6px}
+  /* билеты */
+  .tk-table{display:grid;grid-template-columns:1.4fr repeat(4,1fr);gap:4px 8px;font-size:13px;align-items:baseline}
+  .tk-table .h{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding-bottom:4px;border-bottom:1px solid var(--line)}
+  .tk-table .n{display:flex;align-items:center;gap:8px}
+  .tk-table .n b.sw{display:inline-block;width:10px;height:10px;border-radius:2px}
+  .tk-table .c{font-variant-numeric:tabular-nums}
+  .tk-table .c small{display:block;font-size:11px}
+  .tk-table .tot{border-top:1px solid var(--line);padding-top:6px;font-weight:700}
+  @media (max-width:799px){ .tk-table{grid-template-columns:1.3fr repeat(4,1fr);font-size:12px} .tk-table .c small{font-size:10px} }
   /* прогноз */
   .m i.fc, .legend b.fc{background:repeating-linear-gradient(135deg, var(--cur) 0 3px, transparent 3px 6px);opacity:.75}
   .m i.stack{background:var(--cur);position:relative;display:flex;flex-direction:column}
@@ -100,6 +113,10 @@
 <div class="wrap">
   <header><h1 id="title">Выручка</h1><div id="updated">загрузка…</div></header>
   <div class="chips" id="chips"></div>
+  <div class="mode" id="mode" hidden>
+    <button class="chip on" data-mode="rub">₽ выручка</button><button class="chip" data-mode="ppl">чел. посетители</button>
+    <span class="mode-note">посетители — по билетам в чеках, обновляются раз в час</span>
+  </div>
   <div class="banner" id="banner"></div>
 
   <section class="tiles">
@@ -143,6 +160,19 @@
     <div class="tempo" id="fc-tempo"></div>
   </section>
 
+  <section class="card" id="tickets" hidden>
+    <div class="t"><span>По видам билетов</span><span id="tk-sub"></span></div>
+    <div class="tk-table" id="tk-table"></div>
+    <div class="t" style="margin-top:14px"><span>По месяцам, слоями</span><span id="tk-months-title"></span></div>
+    <div class="scols" id="tk-cols"></div>
+    <div class="strips" id="tk-strips"></div>
+    <div class="axis">
+      <span>янв</span><span>фев</span><span>мар</span><span>апр</span><span>май</span><span>июн</span>
+      <span>июл</span><span>авг</span><span>сен</span><span>окт</span><span>ноя</span><span>дек</span>
+    </div>
+    <div class="legend" id="tk-legend"></div>
+  </section>
+
   <section class="card" id="shares" hidden>
     <div class="t"><span>Доли выручки · год в моменте</span><span id="shares-range"></span></div>
     <div class="donut">
@@ -181,13 +211,29 @@
     { code: 'v1', name: 'Вашунь', color: '#a78bfa' },
   ];
   let current = 'p1';
+  let mode = 'rub';                                   // 'rub' — рубли, 'ppl' — посетители (где есть данные)
+  try { if (localStorage.getItem('dash-mode') === 'ppl') mode = 'ppl'; } catch (e) {}
+  const TICKET_PARTS = [
+    { code: 'full', name: 'Полный', color: '#3b82f6' },
+    { code: 'conc', name: 'Льготный', color: '#f472b6' },
+    { code: 'grp_full', name: 'Групповой полный', color: '#22d3ee' },
+    { code: 'grp_conc', name: 'Групповой льготный', color: '#a78bfa' },
+  ];
+  const TICKET_EXTRA = { code: 'extra', name: 'Доп. маршруты (не посетители)', color: '#6b7a90' };
   try { const saved = localStorage.getItem('dash-object'); if (OBJECTS.some(x => x.code === saved && x.active)) current = saved; } catch (e) {}
   let data = null;
 
   const $ = (id) => document.getElementById(id);
-  const fmt = (n) => (n === null || n === undefined) ? '—' : Math.round(n).toLocaleString('ru-RU') + ' ₽';
+  const rub = (n) => (n === null || n === undefined) ? '—' : Math.round(n).toLocaleString('ru-RU') + ' ₽';
+  const fmt = (n) => (n === null || n === undefined) ? '—' : mode === 'ppl'
+    ? Math.round(n).toLocaleString('ru-RU') + ' чел.' : Math.round(n).toLocaleString('ru-RU') + ' ₽';
   const short = (n) => {
     if (n === null || n === undefined) return '—';
+    if (mode === 'ppl') {
+      if (Math.abs(n) >= 1e6) return (n / 1e6).toLocaleString('ru-RU', { maximumFractionDigits: 2 }) + ' млн';
+      if (Math.abs(n) >= 1e4) return (n / 1e3).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + ' тыс.';
+      return Math.round(n).toLocaleString('ru-RU');
+    }
     if (Math.abs(n) >= 1e6) return (n / 1e6).toLocaleString('ru-RU', { maximumFractionDigits: 1 }) + ' млн';
     if (Math.abs(n) >= 1e3) return Math.round(n / 1e3).toLocaleString('ru-RU') + ' тыс.';
     return Math.round(n).toLocaleString('ru-RU');
@@ -218,13 +264,19 @@
   }
 
   function render() {
-    const o = data && data.objects && data.objects[current];
-    if (!o) { $('banner').textContent = 'Нет данных по этому объекту'; $('banner').classList.add('show'); return; }
+    const base = data && data.objects && data.objects[current];
+    if (!base) { $('banner').textContent = 'Нет данных по этому объекту'; $('banner').classList.add('show'); return; }
+    const hasPeople = !!base.people;
+    if (!hasPeople && mode === 'ppl') mode = 'rub';
+    $('mode').hidden = !hasPeople;
+    $('mode').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+    const o = mode === 'ppl' ? base.people : base;   // те же блоки, другая мера
     const year = d(o.today.date).getFullYear(), prevYear = year - 1;
     const obj = OBJECTS.find(x => x.code === current);
     const name = obj.name;
-    $('title').textContent = 'Выручка · ' + name;
-    document.title = 'Выручка · ' + name;
+    const what = mode === 'ppl' ? 'Посетители' : 'Выручка';
+    $('title').textContent = what + ' · ' + name;
+    document.title = what + ' · ' + name;
 
     // сегодня / 7 дней / средний день
     $('today-l').textContent = 'Сегодня · ' + dayLabel(o.today.date);
@@ -240,6 +292,10 @@
     const pm = o.prev_month.month.split('-'); const pmName = MONTHS_NOM[Number(pm[1]) - 1];
     $('blk-pm').innerHTML = cmpBlock('Прошлый месяц', pmName, o.prev_month, pm[0], `${pmName} ${Number(pm[0]) - 1}`);
     $('blk-ytd').innerHTML = cmpBlock('Год в моменте', rangeLabel(o.ytd.from, o.ytd.to), o.ytd, String(year), String(prevYear));
+    if (mode === 'ppl' && o.ytd.value > 0) {
+      const avg = base.ytd.value / o.ytd.value, pavg = (o.ytd.prev && base.ytd.prev) ? base.ytd.prev / o.ytd.prev : null;
+      $('blk-ytd').insertAdjacentHTML('beforeend', `<div class="sub">средний билет ${rub(avg)}${pavg ? ` · в ${prevYear} — ${rub(pavg)}` : ''}</div>`);
+    }
 
     // по месяцам
     $('months-years').textContent = `${year} / ${prevYear} · % год к году · текущий месяц — % за сопоставимые дни`;
@@ -273,6 +329,7 @@
       ? '* январь 2025: ночная касса учтена с 20 января' : '';
 
     renderShares(o, year, prevYear);
+    renderTickets(base, year, prevYear);
 
     // время обновления и плашки
     const gen = new Date(data.generated_at);
@@ -306,11 +363,60 @@
       : `Метод: месяц ${prevYear} × темп ${year}. Темп года в моменте ${x(f.k_ytd)}, последних ${f.recent_days / 7} недель ${x(f.k_recent)} → рабочий ${x(f.k)}; диапазон — между двумя темпами. Не учитывает то, чего не было в ${prevYear}.`;
   }
 
+  // Посетители по видам билетов (режим «чел.», объект с people_groups)
+  function renderTickets(base, year, prevYear) {
+    const box = $('tickets'), g = base.people_groups;
+    if (mode !== 'ppl' || !g) { box.hidden = true; return; }
+    box.hidden = false;
+    const parts = TICKET_PARTS.filter(p => g[p.code]);
+    const cell = (b) => `<div class="c">${short(b.value)}<small>${pctHtml(b.pct)}</small></div>`;
+    const row = (p, x) => `<div class="n"><b class="sw" style="background:${p.color}"></b>${p.name}</div>${cell(x.today)}${cell(x.week7)}${cell(x.mtd)}${cell(x.ytd)}`;
+    const sumB = (keys, field) => {
+      const vals = keys.map(k => g[k][field]);
+      const value = vals.reduce((a, b) => a + (b.value || 0), 0);
+      const prevs = vals.map(b => b.prev).filter(v => v !== null && v !== undefined);
+      const prev = prevs.length ? prevs.reduce((a, b) => a + b, 0) : null;
+      return { value, prev, pct: prev ? Math.round((value - prev) / prev * 100) : null };
+    };
+    const tot = (label, keys) => `<div class="n tot">${label}</div>` + ['today', 'week7', 'mtd', 'ytd'].map(f => `<div class="c tot">${cell(sumB(keys, f))}</div>`).join('');
+    $('tk-sub').textContent = `${year} · % к ${prevYear}`;
+    $('tk-table').innerHTML = `<div class="h">Билет</div><div class="h">Сегодня</div><div class="h">7 дней</div><div class="h">Месяц</div><div class="h">Год</div>`
+      + parts.map(p => row(p, g[p.code])).join('')
+      + tot('Всего полных', ['full', 'grp_full']) + tot('Всего льготных', ['conc', 'grp_conc'])
+      + tot('Всего посетителей', ['full', 'conc', 'grp_full', 'grp_conc'])
+      + (g.extra ? `<div class="n" style="color:var(--muted)">${TICKET_EXTRA.name}</div>${cell(g.extra.today)}${cell(g.extra.week7)}${cell(g.extra.mtd)}${cell(g.extra.ytd)}` : '');
+    // месяцы слоями по видам билетов
+    const months = base.people.months;
+    const max = Math.max(1, ...months.map(m => m.cur || 0));
+    const share = (mi) => {
+      const vals = parts.map(p => Math.max(0, g[p.code].months[mi].cur || 0));
+      const sum = vals.reduce((a, b) => a + b, 0);
+      return { vals, sum, pct: vals.map(v => sum > 0 ? Math.round(v / sum * 100) : 0) };
+    };
+    $('tk-months-title').textContent = `${year} · высота = посетители за месяц, слои и полоска = доли билетов`;
+    $('tk-cols').innerHTML = months.map((m, mi) => {
+      if (m.cur === null || m.cur === undefined) return '<div class="scol"></div>';
+      const s = share(mi), h = Math.round((m.cur / max) * 100);
+      const layers = parts.map((p, i) => {
+        const lh = s.sum > 0 ? s.vals[i] / s.sum * 100 : 0;
+        const q = (lh * h / 100) < 9 ? ' q' : '';
+        return `<i class="${q}" style="height:${lh}%;background:${p.color}" title="${p.name}: ${fmt(s.vals[i])} (${s.pct[i]}%)">${s.pct[i]}%</i>`;
+      }).join('');
+      return `<div class="scol" style="height:${h}%" title="${MONTHS_NOM[m.m - 1]}: ${fmt(m.cur)}">${layers}</div>`;
+    }).join('');
+    $('tk-strips').innerHTML = months.map((m, mi) => {
+      if (m.cur === null || m.cur === undefined || m.cur <= 0) return '<div class="strip"></div>';
+      const s = share(mi);
+      return `<div class="strip" title="${MONTHS_NOM[m.m - 1]}: ${parts.map((p, i) => p.name + ' ' + s.pct[i] + '%').join(' · ')}">${parts.map((p, i) => `<i style="width:${s.sum > 0 ? s.vals[i] / s.sum * 100 : 0}%;background:${p.color}"></i>`).join('')}</div>`;
+    }).join('');
+    $('tk-legend').innerHTML = parts.map(p => `<span><b class="sw" style="background:${p.color}"></b>${p.name}</span>`).join('');
+  }
+
   // Доли объектов в «Всё»: считаются на странице из блоков p1/w1/v1 того же data.json.
   function renderShares(o, year, prevYear) {
     const box = $('shares');
     const parts = SHARE_PARTS.filter(p => data.objects[p.code]);
-    if (current !== 'all' || parts.length < 2) { box.hidden = true; return; }
+    if (current !== 'all' || mode === 'ppl' || parts.length < 2) { box.hidden = true; return; }
     box.hidden = false;
     const share = (get) => {
       const vals = parts.map(p => Math.max(0, get(data.objects[p.code]) || 0));
@@ -371,6 +477,9 @@
     }
   }
 
+  $('mode').querySelectorAll('button').forEach(b => b.onclick = () => {
+    mode = b.dataset.mode; try { localStorage.setItem('dash-mode', mode); } catch (e) {} render();
+  });
   renderChips();
   load();
   setInterval(load, 5 * 60 * 1000);

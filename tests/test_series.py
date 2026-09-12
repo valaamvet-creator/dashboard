@@ -84,3 +84,31 @@ class Waterfalls(unittest.TestCase):
         self.assertEqual(s[dt.date(2026, 9, 10)], DayTotal(1110.0, True))
         self.assertEqual(s[dt.date(2026, 9, 11)], DayTotal(50.0, False))   # только a, complete=False
         self.assertEqual(s[dt.date(2026, 9, 12)], DayTotal(7.0, True))     # только b
+
+
+class Tickets(unittest.TestCase):
+    def test_classify_ticket_names(self):
+        from server.series import classify_ticket
+        cases = {
+            "1.Полный билет": "full", "Полный билет": "full", "5.Полный 2 тропы": "full",
+            "билет на посещение тропы паасо": "full",
+            "2.Льготный билет": "conc", "6.Льготный 2 тропы": "conc", "Льготный полный билет 2 тропы": "conc",
+            "3.Групповой полный": "grp_full", "Групповой полный билет": "grp_full", "7.Групповой полный 2 тропы": "grp_full",
+            "4.Груповой льготный": "grp_conc", "Групповой льготный билет": "grp_conc", "Груповой льготный": "grp_conc",
+            "Вездеход": "extra", "Гора": "extra", "Льготный гора": "extra", "Раутакангус тропа": "extra",
+            "булка": None, "1 товар": None, "": None,
+        }
+        for name, want in cases.items():
+            self.assertEqual(classify_ticket(name), want, name)
+
+    def test_read_paaso_tickets_counts_people_by_group(self):
+        from server.series import read_paaso_tickets
+        t = read_paaso_tickets(FX / "p1_receipts.csv", FX / "night_sell.csv")
+        d = t[dt.date(2026, 9, 11)]
+        # полный: 2 + 1 (2 тропы) − 1 (возврат) = 2; льготный 1; групп. полный 1; групп. льготный 2; extra 1
+        self.assertEqual(d.groups, {"full": 2, "conc": 1, "grp_full": 1, "grp_conc": 2, "extra": 1})
+        self.assertEqual(d.total, 6)                                  # extra не считаем людьми
+        self.assertEqual(t[dt.date(2025, 9, 12)].groups["full"], 3)
+        # ночной терминал: 2026-09-10 — 2 билета минус 1 возврат билета = 1 человек; 2025-09-11 — 1
+        self.assertEqual(t[dt.date(2026, 9, 10)].groups, {"full": 1, "conc": 0, "grp_full": 0, "grp_conc": 0, "extra": 0})
+        self.assertEqual(t[dt.date(2025, 9, 11)].total, 1)
