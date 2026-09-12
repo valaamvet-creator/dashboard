@@ -35,3 +35,13 @@ def write_daily_series_dump(path: Path, paaso_day_cash: dict, paaso_night_cash: 
         print(f"WARNING: daily series dump failed: {exc}", file=sys.stderr)
 ```
 `paaso_day_today_stats is None` ровно тогда, когда `update_paaso_day_today_from_api` упал и остался кэш.
+
+## Дополнение (12.09.2026): второй объект (w1)
+
+`write_daily_series_dump` получила ещё три параметра: `waterfalls_main_cash`, `waterfalls_second_cash`
+(дневные словари двух касс объекта w1, уже собранные в `main()`) и `waterfalls_today_complete`.
+Для дат, где есть хотя бы одна из этих касс, в запись дня добавляются поля `wf1`, `wf2`, `wf_complete`.
+`wf_complete` для сегодня = метод получения сегодняшних чеков известен и не содержит `cached`
+(`waterfalls_today_stats["method"]`); для прошлых дней — `true`.
+Вызов в `main()` передаёт `waterfalls_main_cash`, `waterfalls_second_cash` и вычисленный `waterfalls_today_complete`.
+Бэкап до правки: `/root/sync_paaso_before_wf_patch.py`.
