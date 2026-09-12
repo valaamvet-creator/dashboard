@@ -10,17 +10,18 @@ export GIT_COMMITTER_NAME="revenue-bot" GIT_COMMITTER_EMAIL="valaam.vet@gmail.co
 [ -f "$SRC" ] || { echo "publish: нет файла $SRC"; exit 1; }
 cd "$REPO" || { echo "publish: нет клона $REPO"; exit 1; }
 
-# Подтянуть изменения страницы/скриптов с Мака; без сети — пробуем опубликовать локально накопленное.
+# На ошибке pull: откатываем rebase и выходим 2 (ничего не публикуется).
+git checkout -q -- data.json 2>/dev/null || true
 if ! git pull --rebase -q origin main; then
   echo "publish: git pull не удался"; git rebase --abort 2>/dev/null; exit 2
 fi
 
-cp "$SRC" data.json
-if git diff --quiet -- data.json && ! git log origin/main..main --oneline | grep -q .; then
+cp "$SRC" data.json || { echo "publish: cp не удался"; exit 1; }
+if git diff --quiet -- data.json && [ -z "$(git rev-list origin/main..HEAD)" ]; then
   echo "publish: data.json не изменился"; exit 0
 fi
 git add data.json
-git diff --cached --quiet || git commit -q -m "data: $(date '+%Y-%m-%d %H:%M')"
+if ! git diff --cached --quiet; then git commit -q -m "data: $(date '+%Y-%m-%d %H:%M')" || { echo "publish: git commit не удался"; exit 1; }; fi
 if ! git push -q origin main; then
   echo "publish: git push не удался"; exit 3
 fi
