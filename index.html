@@ -52,6 +52,22 @@
   .legend b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
   .note{font-size:11px;color:var(--muted);margin-top:6px}
   footer{color:var(--muted);font-size:12px;text-align:center;margin:18px 0 8px}
+  /* доли выручки (вкладка «Всё») */
+  .donut{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+  .ring{width:132px;height:132px;border-radius:50%;position:relative;flex:none;background:var(--prev)}
+  .ring-in{position:absolute;inset:28px;background:var(--card);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;text-align:center;line-height:1.15}
+  .kv{font-size:14px;line-height:1.8;min-width:0}
+  .kv b.sw,.legend b.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:8px;vertical-align:-1px}
+  .kv .pc{font-weight:800;margin-left:6px}
+  .kv .prev{color:var(--muted);font-size:12px;margin-top:4px}
+  .scols{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;height:170px;align-items:end;margin-top:6px}
+  .scol{display:flex;flex-direction:column-reverse;border-radius:3px 3px 0 0;overflow:hidden}
+  .scol i{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#0b1220;overflow:hidden;min-height:0}
+  .scol i.q{color:transparent}
+  .strips{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:6px}
+  .strip{display:flex;height:7px;border-radius:3px;overflow:hidden;background:var(--line)}
+  .strip i{display:block;height:100%}
+  @media (min-width:800px){ .scols{height:230px} .scol i{font-size:11px} .strip{height:8px} }
   @media (min-width:800px){
     .tiles{grid-template-columns:2fr 1fr 1fr}
     .tiles > .card:first-child{grid-column:auto}
@@ -95,6 +111,22 @@
     <div class="note" id="note"></div>
   </section>
 
+  <section class="card" id="shares" hidden>
+    <div class="t"><span>Доли выручки · год в моменте</span><span id="shares-range"></span></div>
+    <div class="donut">
+      <div class="ring" id="ring"><div class="ring-in" id="ring-total"></div></div>
+      <div class="kv" id="shares-kv"></div>
+    </div>
+    <div class="t" style="margin-top:14px"><span>По месяцам, слоями</span><span id="shares-months-title"></span></div>
+    <div class="scols" id="scols"></div>
+    <div class="strips" id="strips"></div>
+    <div class="axis">
+      <span>янв</span><span>фев</span><span>мар</span><span>апр</span><span>май</span><span>июн</span>
+      <span>июл</span><span>авг</span><span>сен</span><span>окт</span><span>ноя</span><span>дек</span>
+    </div>
+    <div class="legend" id="shares-legend"></div>
+  </section>
+
   <footer>Данные: кассы ОФД · обновляется каждые 15 мин</footer>
 </div>
 
@@ -111,6 +143,11 @@
   const MONTHS_NOM = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
   const WEEKDAYS = ['вс','пн','вт','ср','чт','пт','сб'];
   const STALE_MIN = 60;
+  const SHARE_PARTS = [
+    { code: 'p1', name: 'Паасо', color: '#3b82f6' },
+    { code: 'w1', name: 'Водопады', color: '#22d3ee' },
+    { code: 'v1', name: 'Вашунь', color: '#a78bfa' },
+  ];
   let current = 'p1';
   try { const saved = localStorage.getItem('dash-object'); if (OBJECTS.some(x => x.code === saved && x.active)) current = saved; } catch (e) {}
   let data = null;
@@ -184,6 +221,8 @@
     $('note').textContent = (obj.nightNote && o.months[0].prev !== null && prevYear === 2025)
       ? '* январь 2025: ночная касса учтена с 20 января' : '';
 
+    renderShares(o, year, prevYear);
+
     // время обновления и плашки
     const gen = new Date(data.generated_at);
     $('updated').textContent = 'обновлено ' + gen.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ' · ' + gen.getDate() + ' ' + MONTHS_GEN[gen.getMonth()];
@@ -193,6 +232,52 @@
     if (!o.today.complete) msgs.push('данные за сегодня могут быть неполными (одна из касс не ответила)');
     $('banner').textContent = msgs.join(' · ');
     $('banner').classList.toggle('show', msgs.length > 0);
+  }
+
+  // Доли объектов в «Всё»: считаются на странице из блоков p1/w1/v1 того же data.json.
+  function renderShares(o, year, prevYear) {
+    const box = $('shares');
+    const parts = SHARE_PARTS.filter(p => data.objects[p.code]);
+    if (current !== 'all' || parts.length < 2) { box.hidden = true; return; }
+    box.hidden = false;
+    const share = (get) => {
+      const vals = parts.map(p => Math.max(0, get(data.objects[p.code]) || 0));
+      const sum = vals.reduce((a, b) => a + b, 0);
+      return { vals, sum, pct: vals.map(v => sum > 0 ? Math.round(v / sum * 100) : 0) };
+    };
+    // год в моменте
+    const y = share(x => x.ytd.value), py = share(x => x.ytd.prev);
+    $('shares-range').textContent = rangeLabel(o.ytd.from, o.ytd.to) + ' ' + year;
+    let acc = 0;
+    const stops = parts.map((p, i) => { const a = acc; acc += y.sum > 0 ? y.vals[i] / y.sum * 100 : 0; return `${p.color} ${a}% ${acc}%`; });
+    $('ring').style.background = y.sum > 0 ? `conic-gradient(${stops.join(',')})` : 'var(--prev)';
+    $('ring-total').textContent = short(y.sum);
+    $('shares-kv').innerHTML = parts.map((p, i) =>
+      `<div><b class="sw" style="background:${p.color}"></b>${p.name}<span class="pc">${y.pct[i]}%</span> <span style="color:var(--muted)">· ${short(y.vals[i])}</span></div>`).join('')
+      + (py.sum > 0 ? `<div class="prev">в ${prevYear}: ${py.pct.join('% · ')}%</div>` : '');
+    // месяцы слоями
+    const totals = o.months.map(m => m.cur);
+    const max = Math.max(1, ...totals.map(v => v || 0));
+    $('shares-months-title').textContent = `${year} · высота = выручка месяца, слои и полоска = доли`;
+    $('scols').innerHTML = o.months.map((m, mi) => {
+      if (m.cur === null || m.cur === undefined) return '<div class="scol"></div>';
+      const s = share(x => x.months[mi].cur);
+      const h = Math.round((m.cur / max) * 100);
+      const layers = parts.map((p, i) => {
+        const lh = s.sum > 0 ? s.vals[i] / s.sum * 100 : 0;
+        const q = (lh * h / 100) < 9 ? ' q' : '';          // подпись только если слой достаточно высокий
+        return `<i class="${q}" style="height:${lh}%;background:${p.color}" title="${p.name}: ${fmt(s.vals[i])} (${s.pct[i]}%)">${s.pct[i]}%</i>`;
+      }).join('');
+      return `<div class="scol" style="height:${h}%" title="${MONTHS_NOM[m.m - 1]}: ${fmt(m.cur)}">${layers}</div>`;
+    }).join('');
+    // тонкие полоски 100% под месяцами — доли видны и в «низкие» месяцы
+    $('strips').innerHTML = o.months.map((m, mi) => {
+      if (m.cur === null || m.cur === undefined || m.cur <= 0) return '<div class="strip"></div>';
+      const s = share(x => x.months[mi].cur);
+      const segs = parts.map((p, i) => `<i style="width:${s.sum > 0 ? s.vals[i] / s.sum * 100 : 0}%;background:${p.color}" title="${p.name} ${s.pct[i]}%"></i>`).join('');
+      return `<div class="strip" title="${MONTHS_NOM[m.m - 1]}: ${parts.map((p, i) => p.name + ' ' + s.pct[i] + '%').join(' · ')}">${segs}</div>`;
+    }).join('');
+    $('shares-legend').innerHTML = parts.map(p => `<span><b class="sw" style="background:${p.color}"></b>${p.name}</span>`).join('');
   }
 
   function renderChips() {
