@@ -56,15 +56,24 @@
   .mode{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:-6px 0 14px}
   .mode .chip{padding:4px 12px;font-size:12px}
   .mode-note{color:var(--muted);font-size:11px;margin-left:6px}
-  /* билеты */
-  .tk-table{display:grid;grid-template-columns:1.4fr repeat(4,1fr);gap:4px 8px;font-size:13px;align-items:baseline}
-  .tk-table .h{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding-bottom:4px;border-bottom:1px solid var(--line)}
-  .tk-table .n{display:flex;align-items:center;gap:8px}
-  .tk-table .n b.sw{display:inline-block;width:10px;height:10px;border-radius:2px}
-  .tk-table .c{font-variant-numeric:tabular-nums}
-  .tk-table .c small{display:block;font-size:11px}
-  .tk-table .tot{border-top:1px solid var(--line);padding-top:6px;font-weight:700}
-  @media (max-width:799px){ .tk-table{grid-template-columns:1.3fr repeat(4,1fr);font-size:12px} .tk-table .c small{font-size:10px} }
+  /* билеты: два кольца */
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+  .seg button{background:none;border:0;color:var(--muted);font:inherit;font-size:12px;padding:4px 11px;cursor:pointer}
+  .seg button.on{background:var(--cur);color:#fff;font-weight:700}
+  .rings{display:grid;grid-template-columns:1.3fr 1fr;gap:12px;align-items:center;margin-top:6px}
+  .rings > div{display:flex;flex-direction:column;align-items:center}
+  .ring.big{width:170px;height:170px}.ring.big .ring-in{inset:36px;font-size:16px}
+  .ring.small{width:124px;height:124px;opacity:.85}.ring.small .ring-in{inset:26px;font-size:13px}
+  .ring .ring-in{flex-direction:column;gap:1px}
+  .ring-in small{display:block;font-weight:600;font-size:10px;color:var(--muted)}
+  .cap{font-size:11.5px;color:var(--muted);text-align:center;margin-top:8px;line-height:1.5}
+  .cap b{color:var(--text)}
+  .tk-dyn{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:13px;margin-top:14px}
+  .tk-dyn span b.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+  .tk-tot{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  .tk-tot > div{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  .tk-tot .l{margin-bottom:2px}.tk-tot b{font-size:17px;font-weight:800;display:block}.tk-tot small{font-size:12px}
+  @media (max-width:799px){ .rings{grid-template-columns:1fr 1fr} .ring.big{width:140px;height:140px} .ring.big .ring-in{inset:30px;font-size:14px} .ring.small{width:104px;height:104px} .ring.small .ring-in{inset:22px;font-size:12px} .tk-tot{grid-template-columns:1fr} }
   /* прогноз */
   .m i.fc, .legend b.fc{background:repeating-linear-gradient(135deg, var(--cur) 0 3px, transparent 3px 6px);opacity:.75}
   .m i.stack{background:var(--cur);position:relative;display:flex;flex-direction:column}
@@ -161,8 +170,13 @@
   </section>
 
   <section class="card" id="tickets" hidden>
-    <div class="t"><span>По видам билетов</span><span id="tk-sub"></span></div>
-    <div class="tk-table" id="tk-table"></div>
+    <div class="t"><span>Билеты · <span id="tk-years"></span></span><span class="seg" id="tk-period"></span></div>
+    <div class="rings">
+      <div><div class="ring big" id="tk-ring-cur"><div class="ring-in" id="tk-cur"></div></div><div class="cap" id="tk-cur-cap"></div></div>
+      <div><div class="ring small prev" id="tk-ring-prev"><div class="ring-in" id="tk-prev"></div></div><div class="cap" id="tk-prev-cap"></div></div>
+    </div>
+    <div class="tk-dyn" id="tk-dyn"></div>
+    <div class="tk-tot" id="tk-tot"></div>
     <div class="t" style="margin-top:14px"><span>По месяцам, слоями</span><span id="tk-months-title"></span></div>
     <div class="scols" id="tk-cols"></div>
     <div class="strips" id="tk-strips"></div>
@@ -220,6 +234,9 @@
     { code: 'grp_conc', name: 'Групповой льготный', color: '#a78bfa' },
   ];
   const TICKET_EXTRA = { code: 'extra', name: 'Доп. маршруты (не посетители)', color: '#6b7a90' };
+  const TK_PERIODS = [['today', 'Сегодня'], ['week7', '7 дней'], ['mtd', 'Месяц'], ['ytd', 'Год']];
+  let tkPeriod = 'ytd';
+  try { const sp = localStorage.getItem('dash-tk-period'); if (TK_PERIODS.some(x => x[0] === sp)) tkPeriod = sp; } catch (e) {}
   try { const saved = localStorage.getItem('dash-object'); if (OBJECTS.some(x => x.code === saved && x.active)) current = saved; } catch (e) {}
   let data = null;
 
@@ -369,22 +386,44 @@
     if (mode !== 'ppl' || !g) { box.hidden = true; return; }
     box.hidden = false;
     const parts = TICKET_PARTS.filter(p => g[p.code]);
-    const cell = (b) => `<div class="c">${short(b.value)}<small>${pctHtml(b.pct)}</small></div>`;
-    const row = (p, x) => `<div class="n"><b class="sw" style="background:${p.color}"></b>${p.name}</div>${cell(x.today)}${cell(x.week7)}${cell(x.mtd)}${cell(x.ytd)}`;
-    const sumB = (keys, field) => {
-      const vals = keys.map(k => g[k][field]);
-      const value = vals.reduce((a, b) => a + (b.value || 0), 0);
-      const prevs = vals.map(b => b.prev).filter(v => v !== null && v !== undefined);
-      const prev = prevs.length ? prevs.reduce((a, b) => a + b, 0) : null;
-      return { value, prev, pct: prev ? Math.round((value - prev) / prev * 100) : null };
+    // переключатель периода
+    $('tk-period').innerHTML = TK_PERIODS.map(([k, n]) => `<button class="${k === tkPeriod ? 'on' : ''}" data-p="${k}">${n}</button>`).join('');
+    $('tk-period').querySelectorAll('button').forEach(b => b.onclick = () => { tkPeriod = b.dataset.p; try { localStorage.setItem('dash-tk-period', tkPeriod); } catch (e) {} render(); });
+    const per = tkPeriod;
+    const cur = parts.map(p => Math.max(0, g[p.code][per].value || 0));
+    const prv = parts.map(p => Math.max(0, g[p.code][per].prev || 0));
+    const sumC = cur.reduce((a, b) => a + b, 0), sumP = prv.reduce((a, b) => a + b, 0);
+    const pcts = (vals, sum) => vals.map(v => sum > 0 ? Math.round(v / sum * 100) : 0);
+    const pc = pcts(cur, sumC), pp = pcts(prv, sumP);
+    const ringBg = (vals, sum) => {
+      if (sum <= 0) return 'var(--prev)';
+      let acc = 0;
+      return `conic-gradient(${parts.map((p, i) => { const a = acc; acc += vals[i] / sum * 100; return `${p.color} ${a}% ${acc}%`; }).join(',')})`;
     };
-    const tot = (label, keys) => `<div class="n tot">${label}</div>` + ['today', 'week7', 'mtd', 'ytd'].map(f => `<div class="c tot">${cell(sumB(keys, f))}</div>`).join('');
-    $('tk-sub').textContent = `${year} · % к ${prevYear}`;
-    $('tk-table').innerHTML = `<div class="h">Билет</div><div class="h">Сегодня</div><div class="h">7 дней</div><div class="h">Месяц</div><div class="h">Год</div>`
-      + parts.map(p => row(p, g[p.code])).join('')
-      + tot('Всего полных', ['full', 'grp_full']) + tot('Всего льготных', ['conc', 'grp_conc'])
-      + tot('Всего посетителей', ['full', 'conc', 'grp_full', 'grp_conc'])
-      + (g.extra ? `<div class="n" style="color:var(--muted)">${TICKET_EXTRA.name}</div>${cell(g.extra.today)}${cell(g.extra.week7)}${cell(g.extra.mtd)}${cell(g.extra.ytd)}` : '');
+    const periodLabel = per === 'today' ? dayLabel(base.people.today.date)
+      : per === 'ytd' ? rangeLabel(base.people.ytd.from, base.people.ytd.to)
+      : rangeLabel(base.people[per].from, base.people[per].to);
+    $('tk-years').textContent = `${year} против ${prevYear} · ${periodLabel}`;
+    const totPct = sumP > 0 ? Math.round((sumC - sumP) / sumP * 100) : null;
+    $('tk-ring-cur').style.background = ringBg(cur, sumC);
+    $('tk-cur').innerHTML = `${short(sumC)}<small>${year}</small><small>${pctHtml(totPct)}</small>`;
+    $('tk-ring-prev').style.background = ringBg(prv, sumP);
+    $('tk-prev').innerHTML = sumP > 0 ? `${short(sumP)}<small>${prevYear}</small>` : `—<small>${prevYear}</small>`;
+    const cap = (pcs) => parts.map((p, i) => `<b>${pcs[i]}%</b> ${p.name.replace('Групповой', 'Групп.')}`).join(' · ');
+    $('tk-cur-cap').innerHTML = cap(pc);
+    $('tk-prev-cap').innerHTML = sumP > 0 ? cap(pp) : 'нет данных за прошлый год';
+    $('tk-dyn').innerHTML = parts.map((p, i) => `<span><b class="sw" style="background:${p.color}"></b>${p.name} ${short(cur[i])} ${pctHtml(g[p.code][per].pct)}</span>`).join('')
+      + (g.extra && g.extra[per].value ? `<span style="color:var(--muted)"><b class="sw" style="background:${TICKET_EXTRA.color}"></b>${TICKET_EXTRA.name} ${short(g.extra[per].value)}</span>` : '');
+    const sumOf = (keys) => {
+      const value = keys.reduce((a, k) => a + (g[k][per].value || 0), 0);
+      const prevs = keys.map(k => g[k][per].prev).filter(v => v !== null && v !== undefined);
+      const prev = prevs.length ? prevs.reduce((a, b) => a + b, 0) : null;
+      return { value, pct: prev ? Math.round((value - prev) / prev * 100) : null };
+    };
+    const tf = sumOf(['full', 'grp_full']), tc = sumOf(['conc', 'grp_conc']);
+    $('tk-tot').innerHTML = `<div><div class="l">Всего полных</div><b>${short(tf.value)}</b><small>${pctHtml(tf.pct)} к ${prevYear}</small></div>`
+      + `<div><div class="l">Всего льготных</div><b>${short(tc.value)}</b><small>${pctHtml(tc.pct)} к ${prevYear}</small></div>`
+      + `<div><div class="l">Всего посетителей</div><b>${short(sumC)}</b><small>${pctHtml(totPct)} к ${prevYear}</small></div>`;
     // месяцы слоями по видам билетов
     const months = base.people.months;
     const max = Math.max(1, ...months.map(m => m.cur || 0));
