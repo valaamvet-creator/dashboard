@@ -11,7 +11,7 @@ import json
 import sys
 from pathlib import Path
 
-from .metrics import build_payload
+from .metrics import build_payload, sum_forecasts
 from .series import (merge_series, read_daily_total_csv, read_day_z, read_night_sell, read_sync_dump,
                      read_waterfalls_dump, sum_series)
 
@@ -73,6 +73,9 @@ def main() -> int:
     warnings["all"] = warnings["p1"] + [w for w in warnings["w1"] if w not in warnings["p1"]] + warnings["v1"]
 
     payload = build_payload(objects, today, now, warnings)
+    # «Всё»: прогноз — сумма прогнозов объектов, чтобы цифры на вкладках сходились.
+    payload["objects"]["all"]["forecast"] = sum_forecasts(
+        [payload["objects"][c]["forecast"] for c in ("p1", "w1", "v1")])
     for code, block in payload["objects"].items():
         tb = block["today"]
         if warnings[code]:

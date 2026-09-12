@@ -125,7 +125,8 @@ class Payload(unittest.TestCase):
         self.assertEqual(p["generated_at"], "2026-09-11T22:50:39+03:00")
         self.assertEqual(list(p["objects"]), ["p1", "w1"])
         for code in ("p1", "w1"):
-            self.assertEqual(set(p["objects"][code]), {"today", "week7", "mtd", "prev_month", "ytd", "months", "warnings"})
+            self.assertEqual(set(p["objects"][code]), {"today", "week7", "mtd", "prev_month", "ytd", "months", "warnings", "forecast"})
+        self.assertEqual(p["objects"]["w1"]["forecast"]["year"]["fact"], 254 * 10)
         self.assertEqual(p["objects"]["p1"]["warnings"], ["night_fetch_failed"])
         self.assertEqual(p["objects"]["w1"]["warnings"], [])
         self.assertEqual(p["objects"]["p1"]["today"]["value"], 100)
@@ -135,3 +136,73 @@ class Payload(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Forecast(unittest.TestCase):
+    """2025 = 80/день, 2026 = 100/день до 11.09 → оба темпа 1.25, диапазон схлопывается."""
+    def setUp(self):
+        from server.metrics import forecast_block
+        self.fb = forecast_block
+        self.s = flat(D(2025, 1, 1), D(2026, 9, 11), 100)
+        for d in list(self.s):
+            if d.year == 2025:
+                self.s[d] = DayValue(80, 0, True)
+
+    def test_tempos_and_blend(self):
+        f = self.fb(self.s, D(2026, 9, 11))
+        self.assertAlmostEqual(f["k_ytd"], 1.25, places=3)
+        self.assertAlmostEqual(f["k_recent"], 1.25, places=3)
+        self.assertAlmostEqual(f["k"], 1.25, places=3)
+
+    def test_current_month_is_fact_plus_rest(self):
+        f = self.fb(self.s, D(2026, 9, 11))
+        sep = next(m for m in f["months"] if m["m"] == 9)
+        self.assertEqual(sep["fact"], 1100)                      # 11 × 100
+        self.assertEqual(sep["point"], 1100 + round(19 * 80 * 1.25))   # остаток 12–30 сен: 19 дней × 80 × 1.25
+        self.assertEqual(sep["low"], sep["point"]); self.assertEqual(sep["high"], sep["point"])
+
+    def test_future_months_and_year(self):
+        f = self.fb(self.s, D(2026, 9, 11))
+        self.assertEqual([m["m"] for m in f["months"]], [9, 10, 11, 12])
+        octo = next(m for m in f["months"] if m["m"] == 10)
+        self.assertIsNone(octo["fact"])
+        self.assertEqual(octo["point"], round(31 * 80 * 1.25))
+        year_fact = 254 * 100
+        rest = round(19 * 80 * 1.25) + round(31 * 80 * 1.25) + round(30 * 80 * 1.25) + round(31 * 80 * 1.25)
+        self.assertEqual(f["year"]["fact"], year_fact)
+        self.assertEqual(f["year"]["point"], year_fact + rest)
+        self.assertEqual(f["year"]["prev_year"], 365 * 80)
+
+    def test_range_between_two_tempos(self):
+        s = dict(self.s)
+        for i in range(1, 57):                                    # последние 8 недель 2026 — 150/день
+            s[D(2026, 9, 11) - dt.timedelta(days=i)] = DayValue(150, 0, True)
+        f = self.fb(s, D(2026, 9, 11))
+        self.assertGreater(f["k_recent"], f["k_ytd"])
+        self.assertAlmostEqual(f["k_recent"], 150 / 80, places=3)
+        octo = next(m for m in f["months"] if m["m"] == 10)
+        self.assertEqual(octo["low"], round(31 * 80 * f["k_ytd"]))
+        self.assertEqual(octo["high"], round(31 * 80 * f["k_recent"]))
+        self.assertEqual(octo["point"], round(31 * 80 * f["k"]))
+
+    def test_no_previous_year_gives_none(self):
+        s = flat(D(2026, 1, 1), D(2026, 9, 11), 100)
+        self.assertIsNone(self.fb(s, D(2026, 9, 11)))
+
+
+class SumForecasts(unittest.TestCase):
+    def test_sums_points_and_ranges_by_month(self):
+        from server.metrics import sum_forecasts
+        a = {"k": 1.1, "months": [{"m": 9, "fact": 10, "point": 20, "low": 15, "high": 25}, {"m": 10, "fact": None, "point": 30, "low": 20, "high": 40}],
+             "year": {"fact": 100, "point": 150, "low": 130, "high": 170, "prev_year": 120}}
+        b = {"k": 0.9, "months": [{"m": 9, "fact": 5, "point": 8, "low": 7, "high": 9}, {"m": 10, "fact": None, "point": 12, "low": 10, "high": 14}],
+             "year": {"fact": 50, "point": 70, "low": 65, "high": 75, "prev_year": 80}}
+        t = sum_forecasts([a, b, None])
+        self.assertEqual(t["months"][0], {"m": 9, "fact": 15, "point": 28, "low": 22, "high": 34})
+        self.assertEqual(t["months"][1], {"m": 10, "fact": None, "point": 42, "low": 30, "high": 54})
+        self.assertEqual(t["year"], {"fact": 150, "point": 220, "low": 195, "high": 245, "prev_year": 200})
+        self.assertIsNone(t["k"])                                 # у суммы нет единого темпа
+
+    def test_all_none(self):
+        from server.metrics import sum_forecasts
+        self.assertIsNone(sum_forecasts([None, None]))

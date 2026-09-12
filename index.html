@@ -52,6 +52,21 @@
   .legend b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
   .note{font-size:11px;color:var(--muted);margin-top:6px}
   footer{color:var(--muted);font-size:12px;text-align:center;margin:18px 0 8px}
+  /* прогноз */
+  .m i.fc, .legend b.fc{background:repeating-linear-gradient(135deg, var(--cur) 0 3px, transparent 3px 6px);opacity:.75}
+  .m i.stack{background:var(--cur);position:relative;display:flex;flex-direction:column}
+  .m i.stack b{display:block;width:100%;background:repeating-linear-gradient(135deg, #0f1419 0 3px, transparent 3px 6px);opacity:.75}
+  .pcts .fcp{opacity:.7;font-style:italic}
+  .fcy{display:grid;grid-template-columns:1fr;gap:12px}
+  .fcy .v{font-size:26px}
+  .fcy .range{color:var(--muted);font-size:13px}
+  .fcm{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:10px}
+  .fcm > div{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px}
+  .fcm .l{margin-bottom:2px}
+  .fcm b{font-size:16px;font-weight:800}
+  .fcm small{display:block;color:var(--muted);font-size:11px}
+  .tempo{color:var(--muted);font-size:12px;margin-top:8px;line-height:1.5}
+  @media (min-width:800px){ .fcy{grid-template-columns:1fr 1.4fr} .fcy .v{font-size:30px} }
   /* доли выручки (вкладка «Всё») */
   .donut{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
   .ring{width:132px;height:132px;border-radius:50%;position:relative;flex:none;background:var(--prev)}
@@ -109,6 +124,23 @@
     <div class="pcts" id="pcts"></div>
     <div class="legend" id="legend"></div>
     <div class="note" id="note"></div>
+  </section>
+
+  <section class="card" id="forecast" hidden>
+    <div class="t"><span>Прогноз до конца года</span><span id="fc-sub"></span></div>
+    <div class="fcy">
+      <div>
+        <div class="l">Ожидаемый итог года</div>
+        <div class="v" id="fc-year"></div>
+        <div class="range" id="fc-range"></div>
+        <div class="sub" id="fc-vs"></div>
+      </div>
+      <div>
+        <div class="l">Оставшиеся месяцы</div>
+        <div class="fcm" id="fc-months"></div>
+      </div>
+    </div>
+    <div class="tempo" id="fc-tempo"></div>
   </section>
 
   <section class="card" id="shares" hidden>
@@ -211,13 +243,32 @@
 
     // по месяцам
     $('months-years').textContent = `${year} / ${prevYear} · % год к году · текущий месяц — % за сопоставимые дни`;
-    const max = Math.max(1, ...o.months.flatMap(m => [m.cur || 0, m.prev || 0]));
+    const fc = o.forecast, fcm = {};
+    if (fc) fc.months.forEach(m => { fcm[m.m] = m; });
+    const max = Math.max(1, ...o.months.flatMap(m => [m.cur || 0, m.prev || 0, fcm[m.m] ? fcm[m.m].point : 0]));
     $('chart').innerHTML = o.months.map(m => {
       const h = (v) => (v === null || v === undefined) ? 0 : Math.max(v > 0 ? 1 : 0, Math.round(v / max * 100));
-      return `<div class="m" title="${MONTHS_NOM[m.m - 1]}: ${fmt(m.cur)} / ${fmt(m.prev)}"><i style="height:${h(m.cur)}%"></i><i class="p" style="height:${h(m.prev)}%"></i></div>`;
+      const f = fcm[m.m];
+      let curBar;
+      if (f && f.fact === null) {                    // будущий месяц: только прогноз, штрихом
+        curBar = `<i class="fc" style="height:${h(f.point)}%"></i>`;
+      } else if (f) {                                 // текущий месяц: факт + штриховой остаток
+        const rest = Math.max(0, f.point - (m.cur || 0));
+        curBar = `<i class="stack" style="height:${h(f.point)}%"><b class="fc" style="height:${f.point > 0 ? Math.round(rest / f.point * 100) : 0}%"></b></i>`;
+      } else {
+        curBar = `<i style="height:${h(m.cur)}%"></i>`;
+      }
+      const tip = f ? `${MONTHS_NOM[m.m - 1]}: факт ${fmt(m.cur)} · прогноз ${fmt(f.point)} (${short(f.low)}–${short(f.high)}) / ${prevYear}: ${fmt(m.prev)}`
+                    : `${MONTHS_NOM[m.m - 1]}: ${fmt(m.cur)} / ${fmt(m.prev)}`;
+      return `<div class="m" title="${tip}">${curBar}<i class="p" style="height:${h(m.prev)}%"></i></div>`;
     }).join('');
-    $('pcts').innerHTML = o.months.map(m => pctHtml(m.pct)).join('');
-    $('legend').innerHTML = `<span><b style="background:var(--cur)"></b>${year}</span><span><b style="background:var(--prev)"></b>${prevYear}</span>`;
+    $('pcts').innerHTML = o.months.map(m => {
+      const f = fcm[m.m];
+      if (f && f.fact === null && m.prev) return `<span class="fcp">≈${pctHtml(Math.round((f.point / m.prev - 1) * 100))}</span>`;
+      return pctHtml(m.pct);
+    }).join('');
+    $('legend').innerHTML = `<span><b style="background:var(--cur)"></b>${year}</span><span><b style="background:var(--prev)"></b>${prevYear}</span>` + (fc ? `<span><b class="fc"></b>прогноз</span>` : '');
+    renderForecast(o, year, prevYear);
     $('note').textContent = (obj.nightNote && o.months[0].prev !== null && prevYear === 2025)
       ? '* январь 2025: ночная касса учтена с 20 января' : '';
 
@@ -232,6 +283,27 @@
     if (!o.today.complete) msgs.push('данные за сегодня могут быть неполными (одна из касс не ответила)');
     $('banner').textContent = msgs.join(' · ');
     $('banner').classList.toggle('show', msgs.length > 0);
+  }
+
+  // Прогноз: месяц прошлого года × темп текущего (см. server/metrics.py forecast_block)
+  function renderForecast(o, year, prevYear) {
+    const box = $('forecast'), f = o.forecast;
+    if (!f) { box.hidden = true; return; }
+    box.hidden = false;
+    const y = f.year;
+    $('fc-sub').textContent = `${year} · факт до ${dayLabel(o.today.date)} + оценка остатка`;
+    $('fc-year').textContent = '≈ ' + short(y.point);
+    $('fc-range').textContent = `диапазон ${short(y.low)} – ${short(y.high)} · уже есть ${short(y.fact)}`;
+    $('fc-vs').innerHTML = y.prev_year > 0 ? `${pctHtml(Math.round((y.point / y.prev_year - 1) * 100))} к ${prevYear} (${short(y.prev_year)})` : '';
+    $('fc-months').innerHTML = f.months.map(m => {
+      const name = MONTHS_NOM[m.m - 1];
+      const factLine = m.fact !== null ? `<small>факт ${short(m.fact)} + остаток</small>` : `<small>${short(m.low)} – ${short(m.high)}</small>`;
+      return `<div><div class="l">${name}${m.fact !== null ? ' · идёт' : ''}</div><b>≈ ${short(m.point)}</b>${factLine}</div>`;
+    }).join('');
+    const x = (k) => (k === null || k === undefined) ? '—' : '×' + k.toFixed(2).replace('.', ',');
+    $('fc-tempo').textContent = f.k === null
+      ? `Сумма прогнозов объектов. Метод: месяц ${prevYear} × темп ${year}; темп — среднее «года в моменте» и последних ${f.recent_days / 7} недель, диапазон — между ними.`
+      : `Метод: месяц ${prevYear} × темп ${year}. Темп года в моменте ${x(f.k_ytd)}, последних ${f.recent_days / 7} недель ${x(f.k_recent)} → рабочий ${x(f.k)}; диапазон — между двумя темпами. Не учитывает то, чего не было в ${prevYear}.`;
   }
 
   // Доли объектов в «Всё»: считаются на странице из блоков p1/w1/v1 того же data.json.

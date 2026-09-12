@@ -133,6 +133,60 @@ def months_block(series: Series, today: dt.date) -> List[dict]:
     return out
 
 
+RECENT_DAYS = 56   # 8 недель: темп «последнего времени», выровнен по дню недели
+
+
+def _ratio(series: Series, start: dt.date, end: dt.date, pstart: dt.date, pend: dt.date) -> Optional[float]:
+    if not has_data(series, pstart, pend):
+        return None
+    prev = sum_range(series, pstart, pend)
+    return sum_range(series, start, end) / prev if prev > 0 else None
+
+
+def forecast_block(series: Series, today: dt.date) -> Optional[dict]:
+    """Прогноз до конца года: месяц 2025 × темп 2026. Темп — среднее «года в моменте» и последних 8 недель,
+    диапазон — между ними. Текущий месяц = факт + остаток дней прошлого года × темп."""
+    k_ytd = _ratio(series, dt.date(today.year, 1, 1), today,
+                   dt.date(today.year - 1, 1, 1), same_date_prev_year(today))
+    r_end = today - dt.timedelta(days=1)
+    r_start = r_end - dt.timedelta(days=RECENT_DAYS - 1)
+    k_recent = _ratio(series, r_start, r_end, r_start - WEEK_SHIFT, r_end - WEEK_SHIFT)
+    if k_ytd is None and k_recent is None:
+        return None
+    ks = [k for k in (k_ytd, k_recent) if k is not None]
+    k = sum(ks) / len(ks)
+    k_lo, k_hi = min(ks), max(ks)
+
+    months: List[dict] = []
+    fact_year = sum_range(series, dt.date(today.year, 1, 1), today)
+    rest_point = rest_lo = rest_hi = 0.0
+    for m in range(today.month, 13):
+        start, end = _month_bounds(today.year, m)
+        pstart, pend = _month_bounds(today.year - 1, m)
+        if m == today.month:
+            fact = sum_range(series, start, today)
+            base = sum_range(series, same_date_prev_year(today) + dt.timedelta(days=1), pend)
+        else:
+            fact = None
+            base = sum_range(series, pstart, pend)
+        f0 = fact or 0.0
+        point, lo, hi = f0 + base * k, f0 + base * k_lo, f0 + base * k_hi
+        rest_point += base * k; rest_lo += base * k_lo; rest_hi += base * k_hi
+        months.append({"m": m, "fact": None if fact is None else int(round(fact)),
+                       "point": int(round(point)), "low": int(round(lo)), "high": int(round(hi))})
+    prev_year_total = sum_range(series, dt.date(today.year - 1, 1, 1), dt.date(today.year - 1, 12, 31))
+    return {
+        "k_ytd": None if k_ytd is None else round(k_ytd, 4),
+        "k_recent": None if k_recent is None else round(k_recent, 4),
+        "k": round(k, 4),
+        "recent_days": RECENT_DAYS,
+        "months": months,
+        "year": {"fact": int(round(fact_year)), "point": int(round(fact_year + rest_point)),
+                 "low": int(round(fact_year + rest_lo)), "high": int(round(fact_year + rest_hi)),
+                 "prev_year": int(round(prev_year_total))},
+    }
+
+
 def object_block(series: Series, today: dt.date, warnings: List[str]) -> dict:
     return {
         "today": today_block(series, today),
@@ -141,8 +195,27 @@ def object_block(series: Series, today: dt.date, warnings: List[str]) -> dict:
         "prev_month": prev_month_block(series, today),
         "ytd": ytd_block(series, today),
         "months": months_block(series, today),
+        "forecast": forecast_block(series, today),
         "warnings": list(warnings),
     }
+
+
+def sum_forecasts(items: List[Optional[dict]]) -> Optional[dict]:
+    """Прогноз «Всё» = сумма прогнозов объектов по месяцам (точка и границы диапазона)."""
+    parts = [f for f in items if f]
+    if not parts:
+        return None
+    months: Dict[int, dict] = {}
+    for f in parts:
+        for m in f["months"]:
+            acc = months.setdefault(m["m"], {"m": m["m"], "fact": None, "point": 0, "low": 0, "high": 0})
+            if m["fact"] is not None:
+                acc["fact"] = (acc["fact"] or 0) + m["fact"]
+            for key in ("point", "low", "high"):
+                acc[key] += m[key]
+    year = {key: sum(f["year"][key] for f in parts) for key in ("fact", "point", "low", "high", "prev_year")}
+    return {"k_ytd": None, "k_recent": None, "k": None, "recent_days": RECENT_DAYS,
+            "months": [months[m] for m in sorted(months)], "year": year}
 
 
 def build_payload(

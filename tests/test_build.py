@@ -57,6 +57,13 @@ class Build(unittest.TestCase):
         self.assertIn("vashun_sheet_failed", data["objects"]["all"]["warnings"])
         self.assertNotIn("vashun_sheet_failed", data["objects"]["w1"]["warnings"])
 
+    def test_all_forecast_is_sum_of_object_forecasts(self):
+        data, _ = run()
+        fs = [data["objects"][k]["forecast"] for k in ("p1", "w1", "v1")]
+        a = data["objects"]["all"]["forecast"]
+        self.assertEqual(a["year"]["point"], sum(f["year"]["point"] for f in fs if f))
+        self.assertIsNone(a["k"])
+
     def test_all_object_is_sum_of_three(self):
         data, _ = run()
         p1, w1, v1, a = (data["objects"][k] for k in ("p1", "w1", "v1", "all"))
