@@ -112,3 +112,25 @@ class Tickets(unittest.TestCase):
         # ночной терминал: 2026-09-10 — 2 билета минус 1 возврат билета = 1 человек; 2025-09-11 — 1
         self.assertEqual(t[dt.date(2026, 9, 10)].groups, {"full": 1, "conc": 0, "grp_full": 0, "grp_conc": 0, "extra": 0})
         self.assertEqual(t[dt.date(2025, 9, 11)].total, 1)
+
+
+class WaterfallsTickets(unittest.TestCase):
+    def test_classify_waterfalls_ticket(self):
+        from server.series import classify_waterfalls_ticket as c
+        base = 'Услуги связанные с посещением территории объекта "X"'
+        self.assertEqual(c(base), "full")
+        self.assertEqual(c(base + " (группа полный)"), "grp_full")
+        self.assertEqual(c(base + " (Группа полный)"), "grp_full")
+        self.assertEqual(c(base + " (группа льготный)"), "grp_conc")
+        for tail in ("дети 8-16 лет", "пенсионеры", "многодетные", "студенты очной формы обучения", "ветераны БД, труда", "лица имеющие регистрацию в РК"):
+            self.assertEqual(c(f"{base} ({tail})"), "conc", tail)
+        for tail in ("дети до 7 лет", "прочие льготники", "Сортавальский р-н"):
+            self.assertEqual(c(f"{base} ({tail})"), "free", tail)
+        self.assertIsNone(c(""))
+
+    def test_read_waterfalls_tickets(self):
+        from server.series import read_waterfalls_tickets
+        t = read_waterfalls_tickets(FX / "w1_receipts.csv")
+        d = t[dt.date(2026, 9, 11)]
+        self.assertEqual(d.groups, {"full": 2, "conc": 2, "grp_full": 2, "grp_conc": 1, "free": 3})
+        self.assertEqual(d.total, 10)                                 # бесплатные — тоже посетители

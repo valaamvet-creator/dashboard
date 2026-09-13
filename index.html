@@ -70,7 +70,7 @@
   .cap b{color:var(--text)}
   .tk-dyn{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:13px;margin-top:14px}
   .tk-dyn span b.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
-  .tk-tot{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  .tk-tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:12px}
   .tk-tot > div{background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
   .tk-tot .l{margin-bottom:2px}.tk-tot b{font-size:17px;font-weight:800;display:block}.tk-tot small{font-size:12px}
   @media (max-width:799px){ .rings{grid-template-columns:1fr 1fr} .ring.big{width:140px;height:140px} .ring.big .ring-in{inset:30px;font-size:14px} .ring.small{width:104px;height:104px} .ring.small .ring-in{inset:22px;font-size:12px} .tk-tot{grid-template-columns:1fr} }
@@ -227,13 +227,32 @@
   let current = 'p1';
   let mode = 'rub';                                   // 'rub' — рубли, 'ppl' — посетители (где есть данные)
   try { if (localStorage.getItem('dash-mode') === 'ppl') mode = 'ppl'; } catch (e) {}
-  const TICKET_PARTS = [
-    { code: 'full', name: 'Полный', color: '#3b82f6' },
-    { code: 'conc', name: 'Льготный', color: '#f472b6' },
-    { code: 'grp_full', name: 'Групповой полный', color: '#22d3ee' },
-    { code: 'grp_conc', name: 'Групповой льготный', color: '#a78bfa' },
-  ];
-  const TICKET_EXTRA = { code: 'extra', name: 'Доп. маршруты (не посетители)', color: '#6b7a90' };
+  // Группы билетов по объектам. parts — посетители (в кольцах и итогах), extra — не посетители (строкой).
+  const TICKETS = {
+    p1: {
+      parts: [
+        { code: 'full', name: 'Полный', color: '#3b82f6', kind: 'full' },
+        { code: 'conc', name: 'Льготный', color: '#f472b6', kind: 'conc' },
+        { code: 'grp_full', name: 'Групповой полный', color: '#22d3ee', kind: 'full' },
+        { code: 'grp_conc', name: 'Групповой льготный', color: '#a78bfa', kind: 'conc' },
+      ],
+      extra: { code: 'extra', name: 'Доп. маршруты (не посетители)', color: '#6b7a90' },
+      avgTicket: true,
+      note: 'посетители — по билетам в чеках дневных касс и ночного терминала; обновляются раз в час',
+    },
+    w1: {
+      parts: [
+        { code: 'full', name: 'Полный', color: '#3b82f6', kind: 'full' },
+        { code: 'conc', name: 'Льготный', color: '#f472b6', kind: 'conc' },
+        { code: 'grp_full', name: 'Групповой полный', color: '#22d3ee', kind: 'full' },
+        { code: 'grp_conc', name: 'Групповой льготный', color: '#a78bfa', kind: 'conc' },
+        { code: 'free', name: 'Бесплатный', color: '#94a3b8', kind: 'free' },
+      ],
+      extra: null,
+      avgTicket: false,     // в выручке есть вторая касса, в людях — нет: средний билет был бы завышен
+      note: 'посетители — по билетам в чеках касс «Водопады» только за этот год; сравнения с прошлым годом и прогноза по людям нет',
+    },
+  };
   const TK_PERIODS = [['today', 'Сегодня'], ['week7', '7 дней'], ['mtd', 'Месяц'], ['ytd', 'Год']];
   let tkPeriod = 'ytd';
   try { const sp = localStorage.getItem('dash-tk-period'); if (TK_PERIODS.some(x => x[0] === sp)) tkPeriod = sp; } catch (e) {}
@@ -286,6 +305,7 @@
     const hasPeople = !!base.people;
     if (!hasPeople && mode === 'ppl') mode = 'rub';
     $('mode').hidden = !hasPeople;
+    if (hasPeople && TICKETS[current]) $('mode').querySelector('.mode-note').textContent = TICKETS[current].note;
     $('mode').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
     const o = mode === 'ppl' ? base.people : base;   // те же блоки, другая мера
     const year = d(o.today.date).getFullYear(), prevYear = year - 1;
@@ -309,7 +329,7 @@
     const pm = o.prev_month.month.split('-'); const pmName = MONTHS_NOM[Number(pm[1]) - 1];
     $('blk-pm').innerHTML = cmpBlock('Прошлый месяц', pmName, o.prev_month, pm[0], `${pmName} ${Number(pm[0]) - 1}`);
     $('blk-ytd').innerHTML = cmpBlock('Год в моменте', rangeLabel(o.ytd.from, o.ytd.to), o.ytd, String(year), String(prevYear));
-    if (mode === 'ppl' && o.ytd.value > 0) {
+    if (mode === 'ppl' && o.ytd.value > 0 && TICKETS[current] && TICKETS[current].avgTicket) {
       const avg = base.ytd.value / o.ytd.value, pavg = (o.ytd.prev && base.ytd.prev) ? base.ytd.prev / o.ytd.prev : null;
       $('blk-ytd').insertAdjacentHTML('beforeend', `<div class="sub">средний билет ${rub(avg)}${pavg ? ` · в ${prevYear} — ${rub(pavg)}` : ''}</div>`);
     }
@@ -382,10 +402,11 @@
 
   // Посетители по видам билетов (режим «чел.», объект с people_groups)
   function renderTickets(base, year, prevYear) {
-    const box = $('tickets'), g = base.people_groups;
-    if (mode !== 'ppl' || !g) { box.hidden = true; return; }
+    const box = $('tickets'), g = base.people_groups, cfg = TICKETS[current];
+    if (mode !== 'ppl' || !g || !cfg) { box.hidden = true; return; }
     box.hidden = false;
-    const parts = TICKET_PARTS.filter(p => g[p.code]);
+    const parts = cfg.parts.filter(p => g[p.code]);
+    const TICKET_EXTRA = cfg.extra;
     // переключатель периода
     $('tk-period').innerHTML = TK_PERIODS.map(([k, n]) => `<button class="${k === tkPeriod ? 'on' : ''}" data-p="${k}">${n}</button>`).join('');
     $('tk-period').querySelectorAll('button').forEach(b => b.onclick = () => { tkPeriod = b.dataset.p; try { localStorage.setItem('dash-tk-period', tkPeriod); } catch (e) {} render(); });
@@ -413,17 +434,20 @@
     $('tk-cur-cap').innerHTML = cap(pc);
     $('tk-prev-cap').innerHTML = sumP > 0 ? cap(pp) : 'нет данных за прошлый год';
     $('tk-dyn').innerHTML = parts.map((p, i) => `<span><b class="sw" style="background:${p.color}"></b>${p.name} ${short(cur[i])} ${pctHtml(g[p.code][per].pct)}</span>`).join('')
-      + (g.extra && g.extra[per].value ? `<span style="color:var(--muted)"><b class="sw" style="background:${TICKET_EXTRA.color}"></b>${TICKET_EXTRA.name} ${short(g.extra[per].value)}</span>` : '');
+      + (TICKET_EXTRA && g[TICKET_EXTRA.code] && g[TICKET_EXTRA.code][per].value ? `<span style="color:var(--muted)"><b class="sw" style="background:${TICKET_EXTRA.color}"></b>${TICKET_EXTRA.name} ${short(g[TICKET_EXTRA.code][per].value)}</span>` : '');
     const sumOf = (keys) => {
       const value = keys.reduce((a, k) => a + (g[k][per].value || 0), 0);
       const prevs = keys.map(k => g[k][per].prev).filter(v => v !== null && v !== undefined);
       const prev = prevs.length ? prevs.reduce((a, b) => a + b, 0) : null;
       return { value, pct: prev ? Math.round((value - prev) / prev * 100) : null };
     };
-    const tf = sumOf(['full', 'grp_full']), tc = sumOf(['conc', 'grp_conc']);
-    $('tk-tot').innerHTML = `<div><div class="l">Всего полных</div><b>${short(tf.value)}</b><small>${pctHtml(tf.pct)} к ${prevYear}</small></div>`
-      + `<div><div class="l">Всего льготных</div><b>${short(tc.value)}</b><small>${pctHtml(tc.pct)} к ${prevYear}</small></div>`
-      + `<div><div class="l">Всего посетителей</div><b>${short(sumC)}</b><small>${pctHtml(totPct)} к ${prevYear}</small></div>`;
+    const byKind = (kind) => parts.filter(p => p.kind === kind).map(p => p.code);
+    const tf = sumOf(byKind('full')), tc = sumOf(byKind('conc')), tfree = byKind('free').length ? sumOf(byKind('free')) : null;
+    const yoy = (x) => sumP > 0 ? `<small>${pctHtml(x.pct)} к ${prevYear}</small>` : `<small class="na">${prevYear} — нет данных</small>`;
+    $('tk-tot').innerHTML = `<div><div class="l">Всего полных</div><b>${short(tf.value)}</b>${yoy(tf)}</div>`
+      + `<div><div class="l">Всего льготных</div><b>${short(tc.value)}</b>${yoy(tc)}</div>`
+      + (tfree ? `<div><div class="l">Бесплатных</div><b>${short(tfree.value)}</b>${yoy(tfree)}</div>` : '')
+      + `<div><div class="l">Всего посетителей</div><b>${short(sumC)}</b>${yoy({ pct: totPct })}</div>`;
     // месяцы слоями по видам билетов
     const months = base.people.months;
     const max = Math.max(1, ...months.map(m => m.cur || 0));

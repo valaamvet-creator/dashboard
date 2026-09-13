@@ -21,7 +21,7 @@ def run(*extra: str, sync_dump: Path | None = None, max_dump_age_min: int | None
                "--sync-dump", str(sync_dump_path), "--out", str(out),
                "--waterfalls-csv", str(FX / "wf_daily_2025.csv"),
                "--vashun-history-csv", str(FX / "v1_history.csv"), "--vashun-sheet-csv", str(FX / "v1_sheet.csv"),
-               "--p1-receipts", str(FX / "p1_receipts.csv"),
+               "--p1-receipts", str(FX / "p1_receipts.csv"), "--w1-receipts", str(FX / "w1_receipts.csv"),
                "--today", "2026-09-11"]
         if max_dump_age_min is None:
             cmd.extend(["--max-dump-age-min", "999999"])
@@ -76,7 +76,12 @@ class Build(unittest.TestCase):
         self.assertEqual(list(g), ["full", "conc", "grp_full", "grp_conc", "extra"])
         self.assertEqual(g["full"]["today"]["value"], 2)
         self.assertEqual(g["extra"]["today"]["value"], 1)
-        self.assertNotIn("people", data["objects"]["w1"])          # пока только Паасо
+        w = data["objects"]["w1"]["people"]
+        self.assertEqual(w["today"]["value"], 10)                 # включая бесплатных
+        self.assertIsNone(w["today"]["prev"])                     # 2025 по билетам нет
+        self.assertIsNone(w["forecast"])                          # без прошлого года прогноза нет
+        self.assertEqual(list(data["objects"]["w1"]["people_groups"]), ["full", "conc", "grp_full", "grp_conc", "free"])
+        self.assertNotIn("people", data["objects"]["v1"])
 
     def test_all_object_is_sum_of_three(self):
         data, _ = run()

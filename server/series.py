@@ -194,18 +194,18 @@ class TicketDay:
         return sum(v for k, v in self.groups.items() if k != "extra")
 
 
-def _count_tickets(path: Path, acc: Dict[dt.date, Dict[str, int]]) -> None:
+def _count_tickets(path: Path, acc: Dict[dt.date, Dict[str, int]], classify=classify_ticket, groups=TICKET_GROUPS) -> None:
     if not path.exists():
         return
     with path.open(encoding="utf-8", newline="") as f:
         for row in csv.DictReader(f):
-            group = classify_ticket(row.get("name"))
+            group = classify(row.get("name"))
             day = parse_day(row.get("receiptDate"))
             if not group or not day:
                 continue
             sign = -1 if str(row.get("operationType") or "1") in {"2", "3", "PAYBACK", "REFUND"} else 1
             qty = int(round(_num(row.get("quantity")))) or 1
-            acc.setdefault(day, {g: 0 for g in TICKET_GROUPS})[group] += sign * qty
+            acc.setdefault(day, {g: 0 for g in groups})[group] += sign * qty
 
 
 def read_paaso_tickets(day_receipts: Path, night_sell: Path) -> Dict[dt.date, TicketDay]:
@@ -213,4 +213,30 @@ def read_paaso_tickets(day_receipts: Path, night_sell: Path) -> Dict[dt.date, Ti
     acc: Dict[dt.date, Dict[str, int]] = {}
     _count_tickets(day_receipts, acc)
     _count_tickets(night_sell, acc)
+    return {d: TicketDay(g, True) for d, g in acc.items()}
+
+
+# --- Посетители объекта w1: категория билета — в скобках в конце названия услуги -------------------
+
+W1_TICKET_GROUPS = ("full", "conc", "grp_full", "grp_conc", "free")
+_W1_FREE = ("дети до 7", "прочие льгот", "сортавальск")
+
+
+def classify_waterfalls_ticket(name: Optional[str]) -> Optional[str]:
+    n = (name or "").strip().lower()
+    if not n:
+        return None
+    tail = n[n.rfind("(") + 1:].rstrip(")").strip() if "(" in n else ""
+    if not tail:
+        return "full"
+    if any(w in tail for w in _W1_FREE):
+        return "free"
+    if "групп" in tail:
+        return "grp_conc" if "льгот" in tail else "grp_full"
+    return "conc"          # дети 8–16, пенсионеры, многодетные, студенты, ветераны, жители РК
+
+
+def read_waterfalls_tickets(receipts: Path) -> Dict[dt.date, TicketDay]:
+    acc: Dict[dt.date, Dict[str, int]] = {}
+    _count_tickets(receipts, acc, classify_waterfalls_ticket, W1_TICKET_GROUPS)
     return {d: TicketDay(g, True) for d, g in acc.items()}

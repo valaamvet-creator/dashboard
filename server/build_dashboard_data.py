@@ -12,8 +12,9 @@ import sys
 from pathlib import Path
 
 from .metrics import build_payload, object_block, sum_forecasts
-from .series import (DayTotal, TICKET_GROUPS, merge_series, read_daily_total_csv, read_day_z, read_night_sell,
-                     read_paaso_tickets, read_sync_dump, read_waterfalls_dump, sum_series)
+from .series import (DayTotal, TICKET_GROUPS, W1_TICKET_GROUPS, merge_series, read_daily_total_csv, read_day_z,
+                     read_night_sell, read_paaso_tickets, read_sync_dump, read_waterfalls_dump,
+                     read_waterfalls_tickets, sum_series)
 
 MSK = dt.timezone(dt.timedelta(hours=3))
 WS = Path("/root/.openclaw/workspace/revenue_sources")
@@ -38,6 +39,8 @@ def main() -> int:
     ap.add_argument("--max-dump-age-min", type=int, default=60)
     ap.add_argument("--p1-receipts", default=str(WS / "paaso_day_platforma_ofd_receipts_2025_2026_full/ofd_sell.csv"),
                     help="Позиции чеков дневных касс p1 — для подсчёта посетителей по билетам")
+    ap.add_argument("--w1-receipts", default=str(WS / "waterfalls_ofd_2026/ofd_sell.csv"),
+                    help="Позиции чеков касс w1 (только текущий год) — посетители по билетам")
     args = ap.parse_args()
 
     now = dt.datetime.now(MSK)
@@ -75,18 +78,20 @@ def main() -> int:
     warnings["all"] = warnings["p1"] + [w for w in warnings["w1"] if w not in warnings["p1"]] + warnings["v1"]
 
     payload = build_payload(objects, today, now, warnings)
-    # Посетители p1 (режим «чел.»): всего и по группам билетов; сегодня неполный, если неполна выручка.
-    tickets = read_paaso_tickets(Path(args.p1_receipts), Path(args.night_sell))
-    if tickets:
-        p1_today_complete = payload["objects"]["p1"]["today"]["complete"]
+    # Посетители (режим «чел.»): всего и по группам билетов; сегодня неполный, если неполна выручка объекта.
+    def add_people(code: str, tickets: dict, groups) -> None:
+        if not tickets:
+            return
         def people_series(pick):
             return {d: DayTotal(float(pick(t)), t.complete) for d, t in tickets.items()}
-        people = object_block(people_series(lambda t: t.total), today, warnings["p1"])
-        people["today"]["complete"] = people["today"]["complete"] and p1_today_complete
-        payload["objects"]["p1"]["people"] = people
-        payload["objects"]["p1"]["people_groups"] = {
-            g: object_block(people_series(lambda t, g=g: t.groups.get(g, 0)), today, []) for g in TICKET_GROUPS
+        people = object_block(people_series(lambda t: t.total), today, warnings[code])
+        people["today"]["complete"] = people["today"]["complete"] and payload["objects"][code]["today"]["complete"]
+        payload["objects"][code]["people"] = people
+        payload["objects"][code]["people_groups"] = {
+            g: object_block(people_series(lambda t, g=g: t.groups.get(g, 0)), today, []) for g in groups
         }
+    add_people("p1", read_paaso_tickets(Path(args.p1_receipts), Path(args.night_sell)), TICKET_GROUPS)
+    add_people("w1", read_waterfalls_tickets(Path(args.w1_receipts)), W1_TICKET_GROUPS)
 
     # «Всё»: прогноз — сумма прогнозов объектов, чтобы цифры на вкладках сходились.
     payload["objects"]["all"]["forecast"] = sum_forecasts(
