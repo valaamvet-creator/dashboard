@@ -211,7 +211,7 @@
   // Код объекта в data.json → как показывать. Понятные названия живут только здесь.
   const OBJECTS = [
     { code: 'p1', name: 'Паасо', active: true, nightNote: true },
-    { code: 'w1', name: 'Водопады', active: true, nightNote: false },
+    { code: 'w1', name: 'Водопады', active: true, nightNote: false, footnote: '* касса №2 (Федотов) закрыта с 1 мая 2026 — учтена по 30 апреля; в 2025 она давала около трети выручки Водопадов' },
     { code: 'v1', name: 'Вашунь', active: true, nightNote: false },
     { code: 'all', name: 'Всё', active: true, nightNote: true },
   ];
@@ -362,8 +362,10 @@
     }).join('');
     $('legend').innerHTML = `<span><b style="background:var(--cur)"></b>${year}</span><span><b style="background:var(--prev)"></b>${prevYear}</span>` + (fc ? `<span><b class="fc"></b>прогноз</span>` : '');
     renderForecast(o, year, prevYear);
-    $('note').textContent = (obj.nightNote && o.months[0].prev !== null && prevYear === 2025)
-      ? '* январь 2025: ночная касса учтена с 20 января' : '';
+    $('note').textContent = [
+      (obj.nightNote && o.months[0].prev !== null && prevYear === 2025) ? '* январь 2025: ночная касса учтена с 20 января' : '',
+      obj.footnote || '',
+    ].filter(Boolean).join(' · ');
 
     renderShares(o, year, prevYear);
     renderTickets(base, year, prevYear);

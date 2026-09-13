@@ -41,6 +41,8 @@ def main() -> int:
                     help="Позиции чеков дневных касс p1 — для подсчёта посетителей по билетам")
     ap.add_argument("--w1-receipts", default=str(WS / "waterfalls_ofd_2026/ofd_sell.csv"),
                     help="Позиции чеков касс w1 (только текущий год) — посетители по билетам")
+    ap.add_argument("--w1-extra-csv", default=str(WS / "waterfalls_fedotov_2026.csv"),
+                    help="Доп. касса w1 (закрыта 01.05.2026): date,total,grp_full,grp_conc — добавляется к выручке и людям")
     args = ap.parse_args()
 
     now = dt.datetime.now(MSK)
@@ -52,6 +54,9 @@ def main() -> int:
     p1 = merge_series(day, night, dump)
     w1 = read_daily_total_csv(Path(args.waterfalls_csv))
     w1.update(read_waterfalls_dump(Path(args.sync_dump)))
+    w1_extra = read_daily_total_csv(Path(args.w1_extra_csv))       # доп. касса: не перекрывает, а прибавляется
+    if w1_extra:
+        w1 = sum_series(w1, w1_extra)
     v1 = read_daily_total_csv(Path(args.vashun_history_csv))
     v1.update(read_daily_total_csv(Path(args.vashun_sheet_csv)))
     objects = {"p1": p1, "w1": w1, "v1": v1, "all": sum_series(sum_series(p1, w1), v1)}
@@ -91,7 +96,7 @@ def main() -> int:
             g: object_block(people_series(lambda t, g=g: t.groups.get(g, 0)), today, []) for g in groups
         }
     add_people("p1", read_paaso_tickets(Path(args.p1_receipts), Path(args.night_sell)), TICKET_GROUPS)
-    add_people("w1", read_waterfalls_tickets(Path(args.w1_receipts)), W1_TICKET_GROUPS)
+    add_people("w1", read_waterfalls_tickets(Path(args.w1_receipts), Path(args.w1_extra_csv)), W1_TICKET_GROUPS)
 
     # «Всё»: прогноз — сумма прогнозов объектов, чтобы цифры на вкладках сходились.
     payload["objects"]["all"]["forecast"] = sum_forecasts(

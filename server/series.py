@@ -236,7 +236,18 @@ def classify_waterfalls_ticket(name: Optional[str]) -> Optional[str]:
     return "conc"          # дети 8–16, пенсионеры, многодетные, студенты, ветераны, жители РК
 
 
-def read_waterfalls_tickets(receipts: Path) -> Dict[dt.date, TicketDay]:
+def read_waterfalls_tickets(receipts: Path, extra_csv: Optional[Path] = None) -> Dict[dt.date, TicketDay]:
+    """Чеки касс объекта + (опционально) статичный CSV доп. кассы с готовыми колонками групп (date,grp_full,grp_conc,…)."""
     acc: Dict[dt.date, Dict[str, int]] = {}
     _count_tickets(receipts, acc, classify_waterfalls_ticket, W1_TICKET_GROUPS)
+    if extra_csv is not None and extra_csv.exists():
+        with extra_csv.open(encoding="utf-8", newline="") as f:
+            for row in csv.DictReader(f):
+                day = parse_day(row.get("date"))
+                if not day:
+                    continue
+                groups = acc.setdefault(day, {g: 0 for g in W1_TICKET_GROUPS})
+                for g in W1_TICKET_GROUPS:
+                    if row.get(g):
+                        groups[g] += int(round(_num(row.get(g))))
     return {d: TicketDay(g, True) for d, g in acc.items()}

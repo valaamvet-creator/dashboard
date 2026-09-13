@@ -134,3 +134,12 @@ class WaterfallsTickets(unittest.TestCase):
         d = t[dt.date(2026, 9, 11)]
         self.assertEqual(d.groups, {"full": 2, "conc": 2, "grp_full": 2, "grp_conc": 1, "free": 3})
         self.assertEqual(d.total, 10)                                 # бесплатные — тоже посетители
+
+
+class WaterfallsExtraRegister(unittest.TestCase):
+    def test_tickets_include_extra_register_groups(self):
+        from server.series import read_waterfalls_tickets
+        t = read_waterfalls_tickets(FX / "w1_receipts.csv", FX / "w1_extra.csv")
+        d = t[dt.date(2026, 9, 11)]
+        self.assertEqual(d.groups, {"full": 2, "conc": 2, "grp_full": 6, "grp_conc": 2, "free": 3})   # +4 / +1
+        self.assertEqual(t[dt.date(2026, 9, 10)].groups["grp_full"], 2)                            # только доп. касса

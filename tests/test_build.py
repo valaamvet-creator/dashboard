@@ -22,6 +22,7 @@ def run(*extra: str, sync_dump: Path | None = None, max_dump_age_min: int | None
                "--waterfalls-csv", str(FX / "wf_daily_2025.csv"),
                "--vashun-history-csv", str(FX / "v1_history.csv"), "--vashun-sheet-csv", str(FX / "v1_sheet.csv"),
                "--p1-receipts", str(FX / "p1_receipts.csv"), "--w1-receipts", str(FX / "w1_receipts.csv"),
+               "--w1-extra-csv", str(FX / "w1_extra.csv"),
                "--today", "2026-09-11"]
         if max_dump_age_min is None:
             cmd.extend(["--max-dump-age-min", "999999"])
@@ -37,7 +38,7 @@ class Build(unittest.TestCase):
     def test_waterfalls_object_from_dump_and_csv(self):
         data, report = run()
         w = data["objects"]["w1"]
-        self.assertEqual(w["today"]["value"], 348750)           # wf1+wf2 из дампа
+        self.assertEqual(w["today"]["value"], 348750 + 1000)    # wf1+wf2 из дампа + доп. касса
         self.assertFalse(w["today"]["complete"])                # wf_complete=false
         self.assertEqual(w["today"]["prev"], 7000)              # 2025-09-12 из CSV (−364 дня)
         self.assertIn("today_incomplete", w["warnings"])
@@ -77,7 +78,7 @@ class Build(unittest.TestCase):
         self.assertEqual(g["full"]["today"]["value"], 2)
         self.assertEqual(g["extra"]["today"]["value"], 1)
         w = data["objects"]["w1"]["people"]
-        self.assertEqual(w["today"]["value"], 10)                 # включая бесплатных
+        self.assertEqual(w["today"]["value"], 15)                 # 10 по чекам + 5 доп. кассы, включая бесплатных
         self.assertIsNone(w["today"]["prev"])                     # 2025 по билетам нет
         self.assertIsNone(w["forecast"])                          # без прошлого года прогноза нет
         self.assertEqual(list(data["objects"]["w1"]["people_groups"]), ["full", "conc", "grp_full", "grp_conc", "free"])
@@ -87,6 +88,7 @@ class Build(unittest.TestCase):
         data, _ = run()
         p1, w1, v1, a = (data["objects"][k] for k in ("p1", "w1", "v1", "all"))
         self.assertEqual(a["today"]["value"], p1["today"]["value"] + w1["today"]["value"] + v1["today"]["value"])
+        self.assertEqual(w1["today"]["value"], 349750)
         self.assertEqual(a["today"]["prev"], 7000 + 30000)      # у Паасо prev нет
         self.assertFalse(a["today"]["complete"])                # Паасо и Водопады неполные
         self.assertEqual(list(data["objects"]), ["p1", "w1", "v1", "all"])
