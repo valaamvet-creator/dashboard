@@ -8,7 +8,7 @@
 <style>
   :root{
     --bg:#0f1419; --card:#161c23; --line:#232b35; --text:#e6edf3; --muted:#8b98a8;
-    --cur:#3b82f6; --prev:#3a4654; --up:#34d399; --dn:#f87171; --warn:#f59e0b;
+    --cur:#60a5fa; --prev:#3f4b5c; --accent:#3b82f6; --up:#34d399; --dn:#f87171; --warn:#f59e0b;
   }
   *{box-sizing:border-box}
   html,body{margin:0;background:var(--bg);color:var(--text);
@@ -20,7 +20,7 @@
   #updated{color:var(--muted);font-size:12px;white-space:nowrap}
   .chips{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
   .chip{padding:6px 14px;border-radius:999px;border:1px solid var(--line);color:var(--muted);font-size:13px;background:none;cursor:pointer}
-  .chip.on{background:var(--cur);border-color:var(--cur);color:#fff;font-weight:700}
+  .chip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
   .chip:disabled{cursor:default;opacity:.5}
   .banner{display:none;background:rgba(245,158,11,.12);border:1px solid var(--warn);color:#fcd34d;
     border-radius:10px;padding:10px 12px;font-size:13px;margin-bottom:12px}
@@ -37,15 +37,15 @@
   .pair{flex:1;min-width:0}
   .row{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
   .row b{color:var(--text);font-weight:600}
-  .bar{height:10px;border-radius:5px;margin:4px 0 10px;background:var(--prev)}
-  .bar.cur{background:var(--cur)}
+  .bar{height:10px;border-radius:5px;margin:4px 0 10px;background:var(--prev);outline:1px dashed rgba(255,255,255,.35);outline-offset:-1px}
+  .bar.cur{background:var(--cur);outline:none}
   .big{font-size:26px;font-weight:800;min-width:84px;text-align:right}
   .t{display:flex;justify-content:space-between;margin-bottom:8px}
   .t span:last-child{color:var(--muted);font-size:12px}
   .chart{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;align-items:end;height:150px;margin-top:6px}
   .m{display:flex;gap:2px;align-items:flex-end;height:100%}
   .m i{flex:1;display:block;border-radius:3px 3px 0 0;background:var(--cur);min-height:0}
-  .m i.p{background:var(--prev)}
+  .m i.p{background:var(--prev);outline:1px dashed rgba(255,255,255,.35);outline-offset:-1px}
   .axis,.pcts{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;font-size:11px;text-align:center;margin-top:4px}
   .axis{color:var(--muted)}
   .legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:8px}
@@ -54,12 +54,13 @@
   footer{color:var(--muted);font-size:12px;text-align:center;margin:18px 0 8px}
   /* режим ₽ / чел. */
   .mode{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:-6px 0 14px}
+  .mode[hidden]{display:none}
   .mode .chip{padding:4px 12px;font-size:12px}
   .mode-note{color:var(--muted);font-size:11px;margin-left:6px}
   /* билеты: два кольца */
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
   .seg button{background:none;border:0;color:var(--muted);font:inherit;font-size:12px;padding:4px 11px;cursor:pointer}
-  .seg button.on{background:var(--cur);color:#fff;font-weight:700}
+  .seg button.on{background:var(--accent);color:#fff;font-weight:700}
   .rings{display:grid;grid-template-columns:1.3fr 1fr;gap:12px;align-items:center;margin-top:6px}
   .rings > div{display:flex;flex-direction:column;align-items:center}
   .ring.big{width:170px;height:170px}.ring.big .ring-in{inset:36px;font-size:16px}
@@ -89,6 +90,12 @@
   .fcm small{display:block;color:var(--muted);font-size:11px}
   .tempo{color:var(--muted);font-size:12px;margin-top:8px;line-height:1.5}
   @media (min-width:800px){ .fcy{grid-template-columns:1fr 1.4fr} .fcy .v{font-size:30px} }
+  /* узоры: различимы без цвета (монохром, ч/б печать) */
+  .pat-stripes{background-image:repeating-linear-gradient(45deg, rgba(0,0,0,.45) 0 2px, transparent 2px 6px)!important}
+  .pat-dots{background-image:radial-gradient(rgba(0,0,0,.55) 1.1px, transparent 1.3px)!important;background-size:5px 5px!important}
+  .pat-cross{background-image:repeating-linear-gradient(0deg, rgba(0,0,0,.4) 0 1.5px, transparent 1.5px 6px), repeating-linear-gradient(90deg, rgba(0,0,0,.4) 0 1.5px, transparent 1.5px 6px)!important}
+  .pat-hlines{background-image:repeating-linear-gradient(0deg, rgba(0,0,0,.45) 0 2px, transparent 2px 6px)!important}
+  .ring{background-color:var(--prev)}
   /* доли выручки (вкладка «Всё») */
   .donut{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
   .ring{width:132px;height:132px;border-radius:50%;position:relative;flex:none;background:var(--prev)}
@@ -99,7 +106,7 @@
   .kv .prev{color:var(--muted);font-size:12px;margin-top:4px}
   .scols{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;height:170px;align-items:end;margin-top:6px}
   .scol{display:flex;flex-direction:column-reverse;border-radius:3px 3px 0 0;overflow:hidden}
-  .scol i{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#0b1220;overflow:hidden;min-height:0}
+  .scol i{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#0b1220;overflow:hidden;min-height:0;text-shadow:0 0 3px rgba(255,255,255,.6)}
   .scol i.q{color:transparent}
   .strips{display:grid;grid-template-columns:repeat(12,1fr);gap:4px;margin-top:6px}
   .strip{display:flex;height:7px;border-radius:3px;overflow:hidden;background:var(--line)}
@@ -219,10 +226,11 @@
   const MONTHS_NOM = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
   const WEEKDAYS = ['вс','пн','вт','ср','чт','пт','сб'];
   const STALE_MIN = 60;
+  // Цвета подобраны по ЯРКОСТИ (монохромный экран, ч/б печать): светлый / средний / тёмный + узор.
   const SHARE_PARTS = [
-    { code: 'p1', name: 'Паасо', color: '#3b82f6' },
-    { code: 'w1', name: 'Водопады', color: '#22d3ee' },
-    { code: 'v1', name: 'Вашунь', color: '#a78bfa' },
+    { code: 'p1', name: 'Паасо', color: '#60a5fa', pat: '' },
+    { code: 'w1', name: 'Водопады', color: '#bae6fd', pat: 'pat-stripes' },
+    { code: 'v1', name: 'Вашунь', color: '#7c5cd6', pat: 'pat-dots' },
   ];
   let current = 'p1';
   let mode = 'rub';                                   // 'rub' — рубли, 'ppl' — посетители (где есть данные)
@@ -231,10 +239,10 @@
   const TICKETS = {
     p1: {
       parts: [
-        { code: 'full', name: 'Полный', color: '#3b82f6', kind: 'full' },
-        { code: 'conc', name: 'Льготный', color: '#f472b6', kind: 'conc' },
-        { code: 'grp_full', name: 'Групповой полный', color: '#22d3ee', kind: 'full' },
-        { code: 'grp_conc', name: 'Групповой льготный', color: '#a78bfa', kind: 'conc' },
+        { code: 'full', name: 'Полный', color: '#60a5fa', kind: 'full', pat: '' },
+        { code: 'conc', name: 'Льготный', color: '#fbcfe8', kind: 'conc', pat: '' },
+        { code: 'grp_full', name: 'Групповой полный', color: '#22d3ee', kind: 'full', pat: 'pat-stripes' },
+        { code: 'grp_conc', name: 'Групповой льготный', color: '#a78bfa', kind: 'conc', pat: 'pat-dots' },
       ],
       extra: { code: 'extra', name: 'Доп. маршруты (не посетители)', color: '#6b7a90' },
       avgTicket: true,
@@ -242,11 +250,11 @@
     },
     w1: {
       parts: [
-        { code: 'full', name: 'Полный', color: '#3b82f6', kind: 'full' },
-        { code: 'conc', name: 'Льготный', color: '#f472b6', kind: 'conc' },
-        { code: 'grp_full', name: 'Групповой полный', color: '#22d3ee', kind: 'full' },
-        { code: 'grp_conc', name: 'Групповой льготный', color: '#a78bfa', kind: 'conc' },
-        { code: 'free', name: 'Бесплатный', color: '#94a3b8', kind: 'free' },
+        { code: 'full', name: 'Полный', color: '#60a5fa', kind: 'full', pat: '' },
+        { code: 'conc', name: 'Льготный', color: '#fbcfe8', kind: 'conc', pat: '' },
+        { code: 'grp_full', name: 'Групповой полный', color: '#22d3ee', kind: 'full', pat: 'pat-stripes' },
+        { code: 'grp_conc', name: 'Групповой льготный', color: '#a78bfa', kind: 'conc', pat: 'pat-dots' },
+        { code: 'free', name: 'Бесплатный', color: '#64748b', kind: 'free', pat: 'pat-cross' },
       ],
       extra: null,
       avgTicket: false,     // в выручке есть вторая касса, в людях — нет: средний билет был бы завышен
@@ -421,7 +429,8 @@
     const ringBg = (vals, sum) => {
       if (sum <= 0) return 'var(--prev)';
       let acc = 0;
-      return `conic-gradient(${parts.map((p, i) => { const a = acc; acc += vals[i] / sum * 100; return `${p.color} ${a}% ${acc}%`; }).join(',')})`;
+      const gap = 0.8;   // тонкий тёмный зазор между секторами — видно и без цвета
+      return `conic-gradient(${parts.map((p, i) => { const a = acc; acc += vals[i] / sum * 100; return `${p.color} ${a}% ${Math.max(a, acc - gap)}%, var(--card) ${Math.max(a, acc - gap)}% ${acc}%`; }).join(',')})`;
     };
     const periodLabel = per === 'today' ? dayLabel(base.people.today.date)
       : per === 'ytd' ? rangeLabel(base.people.ytd.from, base.people.ytd.to)
@@ -435,7 +444,7 @@
     const cap = (pcs) => parts.map((p, i) => `<b>${pcs[i]}%</b> ${p.name.replace('Групповой', 'Групп.')}`).join(' · ');
     $('tk-cur-cap').innerHTML = cap(pc);
     $('tk-prev-cap').innerHTML = sumP > 0 ? cap(pp) : 'нет данных за прошлый год';
-    $('tk-dyn').innerHTML = parts.map((p, i) => `<span><b class="sw" style="background:${p.color}"></b>${p.name} ${short(cur[i])} ${pctHtml(g[p.code][per].pct)}</span>`).join('')
+    $('tk-dyn').innerHTML = parts.map((p, i) => `<span><b class="sw ${p.pat || ''}" style="background-color:${p.color}"></b>${p.name} ${short(cur[i])} ${pctHtml(g[p.code][per].pct)}</span>`).join('')
       + (TICKET_EXTRA && g[TICKET_EXTRA.code] && g[TICKET_EXTRA.code][per].value ? `<span style="color:var(--muted)"><b class="sw" style="background:${TICKET_EXTRA.color}"></b>${TICKET_EXTRA.name} ${short(g[TICKET_EXTRA.code][per].value)}</span>` : '');
     const sumOf = (keys) => {
       const value = keys.reduce((a, k) => a + (g[k][per].value || 0), 0);
@@ -465,16 +474,16 @@
       const layers = parts.map((p, i) => {
         const lh = s.sum > 0 ? s.vals[i] / s.sum * 100 : 0;
         const q = (lh * h / 100) < 9 ? ' q' : '';
-        return `<i class="${q}" style="height:${lh}%;background:${p.color}" title="${p.name}: ${fmt(s.vals[i])} (${s.pct[i]}%)">${s.pct[i]}%</i>`;
+        return `<i class="${q} ${p.pat || ''}" style="height:${lh}%;background-color:${p.color}" title="${p.name}: ${fmt(s.vals[i])} (${s.pct[i]}%)">${s.pct[i]}%</i>`;
       }).join('');
       return `<div class="scol" style="height:${h}%" title="${MONTHS_NOM[m.m - 1]}: ${fmt(m.cur)}">${layers}</div>`;
     }).join('');
     $('tk-strips').innerHTML = months.map((m, mi) => {
       if (m.cur === null || m.cur === undefined || m.cur <= 0) return '<div class="strip"></div>';
       const s = share(mi);
-      return `<div class="strip" title="${MONTHS_NOM[m.m - 1]}: ${parts.map((p, i) => p.name + ' ' + s.pct[i] + '%').join(' · ')}">${parts.map((p, i) => `<i style="width:${s.sum > 0 ? s.vals[i] / s.sum * 100 : 0}%;background:${p.color}"></i>`).join('')}</div>`;
+      return `<div class="strip" title="${MONTHS_NOM[m.m - 1]}: ${parts.map((p, i) => p.name + ' ' + s.pct[i] + '%').join(' · ')}">${parts.map((p, i) => `<i class="${p.pat || ''}" style="width:${s.sum > 0 ? s.vals[i] / s.sum * 100 : 0}%;background-color:${p.color}"></i>`).join('')}</div>`;
     }).join('');
-    $('tk-legend').innerHTML = parts.map(p => `<span><b class="sw" style="background:${p.color}"></b>${p.name}</span>`).join('');
+    $('tk-legend').innerHTML = parts.map(p => `<span><b class="sw ${p.pat || ''}" style="background-color:${p.color}"></b>${p.name}</span>`).join('');
   }
 
   // Доли объектов в «Всё»: считаются на странице из блоков p1/w1/v1 того же data.json.
@@ -492,11 +501,11 @@
     const y = share(x => x.ytd.value), py = share(x => x.ytd.prev);
     $('shares-range').textContent = rangeLabel(o.ytd.from, o.ytd.to) + ' ' + year;
     let acc = 0;
-    const stops = parts.map((p, i) => { const a = acc; acc += y.sum > 0 ? y.vals[i] / y.sum * 100 : 0; return `${p.color} ${a}% ${acc}%`; });
+    const stops = parts.map((p, i) => { const a = acc; acc += y.sum > 0 ? y.vals[i] / y.sum * 100 : 0; const g = Math.max(a, acc - 0.8); return `${p.color} ${a}% ${g}%, var(--card) ${g}% ${acc}%`; });
     $('ring').style.background = y.sum > 0 ? `conic-gradient(${stops.join(',')})` : 'var(--prev)';
     $('ring-total').textContent = short(y.sum);
     $('shares-kv').innerHTML = parts.map((p, i) =>
-      `<div><b class="sw" style="background:${p.color}"></b>${p.name}<span class="pc">${y.pct[i]}%</span> <span style="color:var(--muted)">· ${short(y.vals[i])}</span></div>`).join('')
+      `<div><b class="sw ${p.pat || ''}" style="background-color:${p.color}"></b>${p.name}<span class="pc">${y.pct[i]}%</span> <span style="color:var(--muted)">· ${short(y.vals[i])}</span></div>`).join('')
       + (py.sum > 0 ? `<div class="prev">в ${prevYear}: ${py.pct.join('% · ')}%</div>` : '');
     // месяцы слоями
     const totals = o.months.map(m => m.cur);
@@ -509,7 +518,7 @@
       const layers = parts.map((p, i) => {
         const lh = s.sum > 0 ? s.vals[i] / s.sum * 100 : 0;
         const q = (lh * h / 100) < 9 ? ' q' : '';          // подпись только если слой достаточно высокий
-        return `<i class="${q}" style="height:${lh}%;background:${p.color}" title="${p.name}: ${fmt(s.vals[i])} (${s.pct[i]}%)">${s.pct[i]}%</i>`;
+        return `<i class="${q} ${p.pat || ''}" style="height:${lh}%;background-color:${p.color}" title="${p.name}: ${fmt(s.vals[i])} (${s.pct[i]}%)">${s.pct[i]}%</i>`;
       }).join('');
       return `<div class="scol" style="height:${h}%" title="${MONTHS_NOM[m.m - 1]}: ${fmt(m.cur)}">${layers}</div>`;
     }).join('');
@@ -517,10 +526,10 @@
     $('strips').innerHTML = o.months.map((m, mi) => {
       if (m.cur === null || m.cur === undefined || m.cur <= 0) return '<div class="strip"></div>';
       const s = share(x => x.months[mi].cur);
-      const segs = parts.map((p, i) => `<i style="width:${s.sum > 0 ? s.vals[i] / s.sum * 100 : 0}%;background:${p.color}" title="${p.name} ${s.pct[i]}%"></i>`).join('');
+      const segs = parts.map((p, i) => `<i class="${p.pat || ''}" style="width:${s.sum > 0 ? s.vals[i] / s.sum * 100 : 0}%;background-color:${p.color}" title="${p.name} ${s.pct[i]}%"></i>`).join('');
       return `<div class="strip" title="${MONTHS_NOM[m.m - 1]}: ${parts.map((p, i) => p.name + ' ' + s.pct[i] + '%').join(' · ')}">${segs}</div>`;
     }).join('');
-    $('shares-legend').innerHTML = parts.map(p => `<span><b class="sw" style="background:${p.color}"></b>${p.name}</span>`).join('');
+    $('shares-legend').innerHTML = parts.map(p => `<span><b class="sw ${p.pat || ''}" style="background-color:${p.color}"></b>${p.name}</span>`).join('');
   }
 
   function renderChips() {
