@@ -115,7 +115,19 @@ def merge_series(
     result: Dict[dt.date, DayValue] = {}
     for d in set(day) | set(night):
         result[d] = DayValue(day.get(d, 0.0), night.get(d, 0.0), True)
-    result.update(dump)
+    for d, fresh in dump.items():
+        previous = result.get(d)
+        if previous is None:
+            result[d] = fresh
+            continue
+        # Дамп зависит от промежуточной Google-вкладки. Если её очистили, но
+        # запись оборвалась, в дамп попадают нули. Они не должны затирать
+        # авторитетные локальные Z-отчёты и чеки за закрытые дни.
+        result[d] = DayValue(
+            fresh.day if fresh.day != 0 or previous.day == 0 else previous.day,
+            fresh.night if fresh.night != 0 or previous.night == 0 else previous.night,
+            fresh.complete,
+        )
     return result
 
 

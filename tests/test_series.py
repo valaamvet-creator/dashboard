@@ -48,6 +48,15 @@ class Merge(unittest.TestCase):
         self.assertEqual(s[dt.date(2026, 9, 11)], DayValue(241050, 2300, False))    # дамп важнее
         self.assertAlmostEqual(s[dt.date(2026, 9, 11)].total, 243350)
 
+    def test_zero_dump_does_not_erase_nonzero_local_sources(self):
+        date = dt.date(2026, 9, 10)
+        s = merge_series(
+            {date: 8291850.0},
+            {date: 330500.0},
+            {date: DayValue(0.0, 0.0, True)},
+        )
+        self.assertEqual(s[date], DayValue(8291850.0, 330500.0, True))
+
 
 if __name__ == "__main__":
     unittest.main()
