@@ -9,11 +9,24 @@ FX = Path(__file__).parent / "fixtures"
 
 
 class ReadDayZ(unittest.TestCase):
-    def test_sums_income_minus_refund_by_close_date(self):
+    def test_sums_income_minus_refund_by_open_date(self):
         s = read_day_z(FX / "day_z.csv")
         self.assertEqual(s[dt.date(2026, 9, 10)], 149000.0)   # 100000 + (50000-1000)
         self.assertEqual(s[dt.date(2025, 9, 11)], 70000.0)
         self.assertEqual(s[dt.date(2026, 9, 11)], 30000.0)
+
+    def test_overnight_shift_belongs_to_sales_day(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "z.csv"
+            p.write_text(
+                "shiftOpenDate,shiftCloseDate,incomeSumm,refundIncomeSumm\n"
+                "2025-10-04 09:00:00,2025-10-05 00:10:00,259950,0\n",
+                encoding="utf-8",
+            )
+            s = read_day_z(p)
+            self.assertEqual(s[dt.date(2025, 10, 4)], 259950.0)
+            self.assertNotIn(dt.date(2025, 10, 5), s)
 
     def test_missing_file_gives_empty(self):
         self.assertEqual(read_day_z(FX / "nope.csv"), {})

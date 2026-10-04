@@ -52,13 +52,13 @@ def _num(value: Optional[str]) -> float:
 
 
 def read_day_z(path: Path) -> Dict[dt.date, float]:
-    """Дневные кассы по Z-отчётам: выручка дня = incomeSumm − refundIncomeSumm, дата — закрытие смены."""
+    """Дневные кассы по Z-отчётам: выручка дня = incomeSumm − refundIncomeSumm, дата — открытие смены."""
     result: Dict[dt.date, float] = defaultdict(float)
     if not path.exists():
         return {}
     with path.open(encoding="utf-8", newline="") as f:
         for row in csv.DictReader(f):
-            day = parse_day(row.get("shiftCloseDate"))
+            day = parse_day(row.get("shiftOpenDate"))
             if not day:
                 continue
             result[day] += _num(row.get("incomeSumm")) - _num(row.get("refundIncomeSumm"))
