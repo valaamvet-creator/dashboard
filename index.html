@@ -325,7 +325,7 @@
 
     // сегодня / 7 дней / средний день
     $('today-l').textContent = 'Сегодня · ' + dayLabel(o.today.date);
-    $('today-v').textContent = fmt(o.today.value);
+    $('today-v').textContent = (!o.today.complete && Number(o.today.value) === 0) ? 'нет данных' : fmt(o.today.value);
     $('today-s').innerHTML = `${pctHtml(o.today.pct)} к полному дню ${dayLabel(o.today.prev_date)} ${prevYear}` + (o.today.complete ? '' : ' <span class="dn">⚠</span>');
     $('week-v').textContent = short(o.week7.value);
     $('week-s').innerHTML = `${pctHtml(o.week7.pct)} к тем же дням ${prevYear} · ${rangeLabel(o.week7.from, o.week7.to)}`;
