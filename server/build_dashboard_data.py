@@ -84,7 +84,7 @@ def main() -> int:
 
     payload = build_payload(objects, today, now, warnings)
     # Посетители (режим «чел.»): всего и по группам билетов; сегодня неполный, если неполна выручка объекта.
-    def add_people(code: str, tickets: dict, groups) -> None:
+    def add_people(code: str, tickets: dict, groups, aggregates=None) -> None:
         if not tickets:
             return
         def people_series(pick):
@@ -92,10 +92,17 @@ def main() -> int:
         people = object_block(people_series(lambda t: t.total), today, warnings[code])
         people["today"]["complete"] = people["today"]["complete"] and payload["objects"][code]["today"]["complete"]
         payload["objects"][code]["people"] = people
+        display_groups = aggregates or {g: (g,) for g in groups}
         payload["objects"][code]["people_groups"] = {
-            g: object_block(people_series(lambda t, g=g: t.groups.get(g, 0)), today, []) for g in groups
+            name: object_block(
+                people_series(lambda t, source=source: sum(t.groups.get(g, 0) for g in source)), today, [])
+            for name, source in display_groups.items()
         }
-    add_people("p1", read_paaso_tickets(Path(args.p1_receipts), Path(args.night_sell)), TICKET_GROUPS)
+    add_people("p1", read_paaso_tickets(Path(args.p1_receipts), Path(args.night_sell)), TICKET_GROUPS, {
+        "private": ("full", "conc"),
+        "organized": ("grp_full", "grp_conc"),
+        "extra": ("extra",),
+    })
     add_people("w1", read_waterfalls_tickets(Path(args.w1_receipts), Path(args.w1_extra_csv)), W1_TICKET_GROUPS)
 
     # «Всё»: прогноз — сумма прогнозов объектов, чтобы цифры на вкладках сходились.

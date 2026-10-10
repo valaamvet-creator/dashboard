@@ -74,8 +74,10 @@ class Build(unittest.TestCase):
         self.assertEqual(ppl["today"]["prev"], 3)                 # 2025-09-12
         self.assertEqual(ppl["today"]["pct"], 100)
         g = data["objects"]["p1"]["people_groups"]
-        self.assertEqual(list(g), ["full", "conc", "grp_full", "grp_conc", "extra"])
-        self.assertEqual(g["full"]["today"]["value"], 2)
+        self.assertEqual(list(g), ["private", "organized", "extra"])
+        self.assertEqual(g["private"]["today"]["value"], 3)       # полный + льготный
+        self.assertEqual(g["organized"]["today"]["value"], 3)     # полный + льготный групповые
+        self.assertEqual(g["private"]["today"]["value"] + g["organized"]["today"]["value"], ppl["today"]["value"])
         self.assertEqual(g["extra"]["today"]["value"], 1)
         w = data["objects"]["w1"]["people"]
         self.assertEqual(w["today"]["value"], 15)                 # 10 по чекам + 5 доп. кассы, включая бесплатных
