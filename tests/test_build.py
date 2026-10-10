@@ -83,7 +83,11 @@ class Build(unittest.TestCase):
         self.assertEqual(w["today"]["value"], 15)                 # 10 по чекам + 5 доп. кассы, включая бесплатных
         self.assertIsNone(w["today"]["prev"])                     # 2025 по билетам нет
         self.assertIsNone(w["forecast"])                          # без прошлого года прогноза нет
-        self.assertEqual(list(data["objects"]["w1"]["people_groups"]), ["full", "conc", "grp_full", "grp_conc", "free"])
+        wg = data["objects"]["w1"]["people_groups"]
+        self.assertEqual(list(wg), ["private", "organized"])
+        self.assertEqual(wg["private"]["today"]["value"], 7)       # полный + льготный + бесплатный
+        self.assertEqual(wg["organized"]["today"]["value"], 8)     # полный + льготный групповые
+        self.assertEqual(wg["private"]["today"]["value"] + wg["organized"]["today"]["value"], w["today"]["value"])
         self.assertNotIn("people", data["objects"]["v1"])
 
     def test_all_object_is_sum_of_three(self):

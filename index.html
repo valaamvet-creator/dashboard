@@ -248,11 +248,8 @@
     },
     w1: {
       parts: [
-        { code: 'full', name: 'Полный', color: '#60a5fa', kind: 'full', pat: '' },
-        { code: 'conc', name: 'Льготный', color: '#fbcfe8', kind: 'conc', pat: '' },
-        { code: 'grp_full', name: 'Групповой полный', color: '#22d3ee', kind: 'full', pat: 'pat-stripes' },
-        { code: 'grp_conc', name: 'Групповой льготный', color: '#a78bfa', kind: 'conc', pat: 'pat-dots' },
-        { code: 'free', name: 'Бесплатный', color: '#64748b', kind: 'free', pat: 'pat-cross' },
+        { code: 'private', name: 'Частные посетители', color: '#60a5fa', kind: 'private', pat: '' },
+        { code: 'organized', name: 'Организованные группы', color: '#a78bfa', kind: 'organized', pat: 'pat-dots' },
       ],
       extra: null,
       avgTicket: false,     // в выручке есть вторая касса, в людях — нет: средний билет был бы завышен
@@ -450,14 +447,8 @@
       const prev = prevs.length ? prevs.reduce((a, b) => a + b, 0) : null;
       return { value, pct: prev ? Math.round((value - prev) / prev * 100) : null };
     };
-    const byKind = (kind) => parts.filter(p => p.kind === kind).map(p => p.code);
-    const tf = sumOf(byKind('full')), tc = sumOf(byKind('conc')), tfree = byKind('free').length ? sumOf(byKind('free')) : null;
     const yoy = (x) => sumP > 0 ? `<small>${pctHtml(x.pct)} к ${prevYear}</small>` : `<small class="na">${prevYear} — нет данных</small>`;
-    const categoryTotals = current === 'p1'
-      ? parts.map((p, i) => `<div><div class="l">${p.name}</div><b>${short(cur[i])}</b>${yoy(sumOf([p.code]))}</div>`).join('')
-      : `<div><div class="l">Всего полных</div><b>${short(tf.value)}</b>${yoy(tf)}</div>`
-        + `<div><div class="l">Всего льготных</div><b>${short(tc.value)}</b>${yoy(tc)}</div>`
-        + (tfree ? `<div><div class="l">Бесплатных</div><b>${short(tfree.value)}</b>${yoy(tfree)}</div>` : '');
+    const categoryTotals = parts.map((p, i) => `<div><div class="l">${p.name}</div><b>${short(cur[i])}</b>${yoy(sumOf([p.code]))}</div>`).join('');
     $('tk-tot').innerHTML = categoryTotals
       + `<div><div class="l">Всего посетителей</div><b>${short(sumC)}</b>${yoy({ pct: totPct })}</div>`;
     // месяцы слоями по видам билетов

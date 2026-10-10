@@ -103,7 +103,10 @@ def main() -> int:
         "organized": ("grp_full", "grp_conc"),
         "extra": ("extra",),
     })
-    add_people("w1", read_waterfalls_tickets(Path(args.w1_receipts), Path(args.w1_extra_csv)), W1_TICKET_GROUPS)
+    add_people("w1", read_waterfalls_tickets(Path(args.w1_receipts), Path(args.w1_extra_csv)), W1_TICKET_GROUPS, {
+        "private": ("full", "conc", "free"),
+        "organized": ("grp_full", "grp_conc"),
+    })
 
     # «Всё»: прогноз — сумма прогнозов объектов, чтобы цифры на вкладках сходились.
     payload["objects"]["all"]["forecast"] = sum_forecasts(
