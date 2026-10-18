@@ -75,9 +75,14 @@ def main() -> int:
             dump_warnings.append("sync_dump_stale")
     night_warnings = ["night_fetch_failed"] if args.night_fetch_status != 0 else []
     sheet_warnings = ["vashun_sheet_failed"] if args.vashun_sheet_status != 0 else []
+    if today not in v1:
+        sheet_warnings.append("vashun_today_source_missing")
+    waterfall_warnings = list(dump_warnings)
+    if today not in w1 or not w1[today].complete:
+        waterfall_warnings.append("waterfalls_today_source_incomplete")
     warnings = {
         "p1": dump_warnings + night_warnings,
-        "w1": list(dump_warnings),
+        "w1": waterfall_warnings,
         "v1": list(sheet_warnings),
     }
     warnings["all"] = warnings["p1"] + [w for w in warnings["w1"] if w not in warnings["p1"]] + warnings["v1"]
@@ -108,6 +113,18 @@ def main() -> int:
         "organized": ("grp_full", "grp_conc"),
     })
 
+    # Source dates must not be confused with the time the page was rebuilt.
+    for code, series in (("w1", w1), ("v1", v1)):
+        observed = [d for d, value in series.items()
+                    if value.complete or value.total != 0]
+        current = series.get(today)
+        status = ("available" if current and current.complete else
+                  "incomplete" if current and current.total != 0 else "unavailable")
+        payload["objects"][code]["source"] = {
+            "latest_available_day": max(observed).isoformat() if observed else None,
+            "today_status": status,
+        }
+
     # «Всё»: прогноз — сумма прогнозов объектов, чтобы цифры на вкладках сходились.
     payload["objects"]["all"]["forecast"] = sum_forecasts(
         [payload["objects"][c]["forecast"] for c in ("p1", "w1", "v1")])
@@ -117,6 +134,7 @@ def main() -> int:
             tb["complete"] = False
         if not tb["complete"]:
             block["warnings"].append("today_incomplete")
+            tb["pct"] = None
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -132,7 +150,7 @@ def main() -> int:
         "w1_today_value": payload["objects"]["w1"]["today"]["value"],
         "v1_today_value": payload["objects"]["v1"]["today"]["value"],
         "out_rows_days": len(p1),
-        "warnings": payload["objects"]["p1"]["warnings"],
+        "warnings": payload["objects"]["all"]["warnings"],
     }, ensure_ascii=False))
     return 0
 

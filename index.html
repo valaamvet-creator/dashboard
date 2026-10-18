@@ -321,7 +321,7 @@
     // сегодня / 7 дней / средний день
     $('today-l').textContent = 'Сегодня · ' + dayLabel(o.today.date);
     $('today-v').textContent = (!o.today.complete && Number(o.today.value) === 0) ? 'нет данных' : fmt(o.today.value);
-    $('today-s').innerHTML = `${pctHtml(o.today.pct)} к полному дню ${dayLabel(o.today.prev_date)} ${prevYear}` + (o.today.complete ? '' : ' <span class="dn">⚠</span>');
+    $('today-s').innerHTML = `${pctHtml(o.today.complete ? o.today.pct : null)} к полному дню ${dayLabel(o.today.prev_date)} ${prevYear}` + (o.today.complete ? '' : ' <span class="dn">⚠</span>');
     $('week-v').textContent = short(o.week7.value);
     $('week-s').innerHTML = `${pctHtml(o.week7.pct)} к тем же дням ${prevYear} · ${rangeLabel(o.week7.from, o.week7.to)}`;
     $('avg-v').textContent = short(o.week7.avg_day);
@@ -379,7 +379,18 @@
     const msgs = [];
     const ageMin = (Date.now() - gen.getTime()) / 60000;
     if (ageMin > STALE_MIN) msgs.push('данные не обновлялись с ' + gen.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) + ' — цифры за сегодня могут отставать');
-    if (!o.today.complete) msgs.push('данные за сегодня могут быть неполными (одна из касс не ответила)');
+    const sourceObjects = current === 'all'
+      ? OBJECTS.filter(x => x.code !== 'all') : [obj];
+    let sourceWarning = false;
+    for (const entry of sourceObjects) {
+      const source = data.objects[entry.code]?.source;
+      if (!source || source.today_status === 'available') continue;
+      sourceWarning = true;
+      const last = source.latest_available_day ? ' · последняя дата с данными: ' + dayLabel(source.latest_available_day) : '';
+      msgs.push(entry.name + ': ' + (source.today_status === 'unavailable'
+        ? 'данные за сегодня не поступили из источника' : 'сегодняшние данные неполные') + last);
+    }
+    if (!o.today.complete && !sourceWarning) msgs.push('данные за сегодня неполные');
     $('banner').textContent = msgs.join(' · ');
     $('banner').classList.toggle('show', msgs.length > 0);
   }
